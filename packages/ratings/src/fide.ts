@@ -59,3 +59,4 @@ export function calculateFideElo(
     isProvisional: player.gamesPlayed + 1 < FIDE_CONFIG.PROVISIONAL_GAMES_THRESHOLD,
   };
 }
+

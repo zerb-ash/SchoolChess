@@ -170,3 +170,4 @@ export interface RatingCalculationResult {
   ratingDelta: number;
   isProvisional: boolean;
 }
+

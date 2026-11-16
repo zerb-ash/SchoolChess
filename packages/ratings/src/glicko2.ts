@@ -121,3 +121,4 @@ export function calculateGlicko2(
     isProvisional: newRd > GLICKO2_CONFIG.PROVISIONAL_RD_THRESHOLD,
   };
 }
+
