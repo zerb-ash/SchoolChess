@@ -1,0 +1,83 @@
+import { z } from 'zod';
+// ==========================================
+// 1. HARDENED SYSTEM LIMITS (DDoS / Bloat Protections)
+// ==========================================
+export const SYSTEM_LIMITS = {
+    MAX_BODY_LIMIT_BYTES: 16 * 1024, // 16 KB hard cap on incoming HTTP JSON bodies
+    MAX_WS_FRAME_BYTES: 4 * 1024, // 4 KB hard cap on individual WebSocket frames
+    MAX_USERNAME_LENGTH: 20,
+    MIN_USERNAME_LENGTH: 3,
+    MAX_PASSWORD_LENGTH: 72, // 72 chars prevents Argon2/bcrypt CPU exhaustion DoS
+    MIN_PASSWORD_LENGTH: 8,
+    MAX_CHALLENGE_PER_USER_WINDOW: 5, // Max challenges created per 10-minute window
+    MAX_CONCURRENT_GAMES_PER_USER: 3,
+    MAX_WS_MESSAGES_PER_SEC: 10, // Token bucket cap per socket connection
+    DEFAULT_RECONNECT_GRACE_SEC: 60, // Grace period for player disconnects
+};
+// ==========================================
+// 2. HARDENED AUTHENTICATION SCHEMAS
+// (Pure Username + Password, Zero Unicode Exploit Vector)
+// ==========================================
+export const UsernameRegex = /^[a-zA-Z0-9_-]+$/;
+export const UsernameSchema = z
+    .string()
+    .min(SYSTEM_LIMITS.MIN_USERNAME_LENGTH, { message: `Username must be at least ${SYSTEM_LIMITS.MIN_USERNAME_LENGTH} characters.` })
+    .max(SYSTEM_LIMITS.MAX_USERNAME_LENGTH, { message: `Username cannot exceed ${SYSTEM_LIMITS.MAX_USERNAME_LENGTH} characters.` })
+    .regex(UsernameRegex, { message: 'Username can only contain alphanumeric characters, underscores, and hyphens.' })
+    .transform((val) => val.trim().toLowerCase());
+export const PasswordSchema = z
+    .string()
+    .min(SYSTEM_LIMITS.MIN_PASSWORD_LENGTH, { message: `Password must be at least ${SYSTEM_LIMITS.MIN_PASSWORD_LENGTH} characters.` })
+    .max(SYSTEM_LIMITS.MAX_PASSWORD_LENGTH, { message: `Password cannot exceed ${SYSTEM_LIMITS.MAX_PASSWORD_LENGTH} characters.` });
+export const RegisterRequestSchema = z.object({
+    username: UsernameSchema,
+    password: PasswordSchema,
+});
+export const LoginRequestSchema = z.object({
+    username: UsernameSchema,
+    password: PasswordSchema,
+});
+// ==========================================
+// 3. CHESS DOMAIN & RATING TYPES
+// ==========================================
+export const RatingSystemEnum = z.enum(['fide', 'chess_com', 'lichess']);
+export const TimeCategoryEnum = z.enum(['bullet', 'blitz', 'rapid', 'classical', 'untimed']);
+export const GameResultEnum = z.enum(['1-0', '0-1', '1/2-1/2', '*']);
+export const GameTerminationEnum = z.enum([
+    'checkmate',
+    'stalemate',
+    'timeout',
+    'resignation',
+    'draw_agreement',
+    'insufficient_material',
+    'threefold_repetition',
+    'fivefold_repetition',
+    'fifty_moves',
+    'seventy_five_moves',
+    'abandoned'
+]);
+export const PieceColorEnum = z.enum(['w', 'b']);
+export const ChessSquareRegex = /^[a-h][1-8]$/;
+export const ChessSquareSchema = z.string().regex(ChessSquareRegex, { message: 'Must be a valid algebraic square (e.g., e4, g1)' });
+// ==========================================
+// 4. WEBSOCKET PACKET SCHEMAS (Sub-50ms Hot-Path)
+// ==========================================
+export const MoveSubmissionSchema = z.object({
+    gameId: z.string().uuid(),
+    from: ChessSquareSchema,
+    to: ChessSquareSchema,
+    promotion: z.enum(['q', 'r', 'b', 'n']).optional(),
+    expectedMoveNumber: z.number().int().min(0),
+    idempotencyKey: z.string().uuid(),
+});
+export const GameJoinSchema = z.object({
+    gameId: z.string().uuid(),
+});
+export const DrawActionSchema = z.object({
+    gameId: z.string().uuid(),
+    action: z.enum(['offer', 'accept', 'decline', 'claim_repetition', 'claim_fifty']),
+});
+export const ResignSchema = z.object({
+    gameId: z.string().uuid(),
+});
+//# sourceMappingURL=index.js.map
