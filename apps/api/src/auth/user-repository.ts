@@ -163,3 +163,4 @@ export class InMemoryUserRepository implements IUserRepository {
     return this.ratings.get(userId) ?? [];
   }
 }
+

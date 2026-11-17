@@ -129,3 +129,4 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
     });
   });
 }
+

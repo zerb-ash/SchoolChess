@@ -153,3 +153,4 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
   });
   assert.equal(postLogoutMe.statusCode, 401);
 });
+
