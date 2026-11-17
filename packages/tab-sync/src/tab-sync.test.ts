@@ -24,3 +24,4 @@ test('TabSocketManager - accepts game subscriptions and generates valid tab ID',
   assert.ok(manager.getTabId().length > 5);
   manager.destroy();
 });
+

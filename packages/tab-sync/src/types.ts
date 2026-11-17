@@ -29,3 +29,4 @@ export interface TabSyncOptions {
   onConnectionChange?: (connected: boolean) => void;
   onRoleChange?: (role: TabRole) => void;
 }
+
