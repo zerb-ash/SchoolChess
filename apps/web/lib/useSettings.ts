@@ -23,6 +23,11 @@ export interface AppSettings {
   highlightLegalMoves: boolean;
   soundEnabled: boolean;
   volume: number;
+  enablePremoves: boolean;
+  autoQueenPromotion: boolean;
+  animationSpeed: 'fast' | 'normal' | 'instant';
+  autoFlipWhenBlack: boolean;
+  highContrastHighlight: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -34,6 +39,11 @@ const DEFAULT_SETTINGS: AppSettings = {
   highlightLegalMoves: true,
   soundEnabled: true,
   volume: 0.7,
+  enablePremoves: true,
+  autoQueenPromotion: false,
+  animationSpeed: 'normal',
+  autoFlipWhenBlack: true,
+  highContrastHighlight: false,
 };
 
 const STORAGE_KEY = 'schoolchess_user_settings_v1';

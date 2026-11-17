@@ -5,7 +5,7 @@ import url from 'node:url';
 import { registerAuthRoutes } from './routes/auth.js';
 import { challengesRoutes } from './routes/challenges.js';
 import { matchmakingRoutes } from './routes/matchmaking.js';
-import { IUserRepository, InMemoryUserRepository, PostgresUserRepository } from './auth/user-repository.js';
+import { IUserRepository, InMemoryUserRepository, PostgresUserRepository, ResilientUserRepository } from './auth/user-repository.js';
 import { createDatabaseClient } from '@schoolchess/database';
 
 export function buildServer(userRepo?: IUserRepository) {
@@ -22,7 +22,7 @@ export function buildServer(userRepo?: IUserRepository) {
   const repo = userRepo || (() => {
     try {
       const { db } = createDatabaseClient();
-      return new PostgresUserRepository(db);
+      return new ResilientUserRepository(new PostgresUserRepository(db));
     } catch {
       return new InMemoryUserRepository();
     }
@@ -30,6 +30,37 @@ export function buildServer(userRepo?: IUserRepository) {
 
   app.get('/health', async () => {
     return { status: 'ok', uptime: process.uptime() };
+  });
+
+  app.get('/api/v1/leaderboards', async (req) => {
+    const query = req.query as { system?: string; category?: string };
+    const system = query.system || 'fide';
+    const category = query.category || 'blitz';
+
+    if (!repo.getAllUsers) {
+      return { entries: [] };
+    }
+
+    const allUsers = await repo.getAllUsers();
+    const entries = [];
+
+    for (const u of allUsers) {
+      const ratings = await repo.getUserRatings(u.id);
+      const match = ratings.find((r) => r.system === system && r.category === category);
+      if (match) {
+        entries.push({
+          userId: u.id,
+          username: u.username,
+          rating: match.rating,
+          provisional: match.provisional,
+          games: 0,
+          winRate: '0%',
+        });
+      }
+    }
+
+    entries.sort((a, b) => b.rating - a.rating);
+    return { entries };
   });
 
   app.register(

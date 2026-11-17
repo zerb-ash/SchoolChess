@@ -239,6 +239,7 @@ export default function LiveGamePage() {
           lastMove={lastMove}
           isCheck={isCheck}
           turn={turn}
+          autoQueen={settings.autoQueenPromotion}
           onMakeMove={handleMakeMove}
           getLegalMovesForSquare={getLegalMovesForSquare}
           disabled={isGameOver || !isMyTurn}

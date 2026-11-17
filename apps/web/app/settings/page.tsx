@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAppSettings, PRESET_THEMES } from '../../lib/useSettings';
-import { Settings as SettingsIcon, Palette, Volume2, Eye, Download, Upload, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Palette, Volume2, Eye, Sliders, Zap, Check } from 'lucide-react';
 import { soundSystem } from '../../lib/audio';
 
 const PALETTE_SWATCHES = [
@@ -252,6 +252,96 @@ export default function SettingsPage() {
                 }`}
               />
             </button>
+          </div>
+        </div>
+
+        {/* Gameplay & Move Mechanics Card */}
+        <div className="bg-wood-900 border border-wood-800 rounded-2xl p-6 shadow-xl flex flex-col gap-4">
+          <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-brass-400" />
+            <span>Gameplay & Mechanics</span>
+          </h2>
+
+          <div className="flex items-center justify-between py-2 border-b border-wood-800">
+            <div>
+              <span className="text-xs font-bold text-parchment-200 block">Premoves</span>
+              <span className="text-[11px] text-parchment-400">Queue your next move during opponent turn for sub-50ms execution</span>
+            </div>
+            <button
+              onClick={() => updateSettings({ enablePremoves: !settings.enablePremoves })}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                settings.enablePremoves ? 'bg-brass-600' : 'bg-wood-950 border border-wood-800'
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
+                  settings.enablePremoves ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-2 border-b border-wood-800">
+            <div>
+              <span className="text-xs font-bold text-parchment-200 block">Auto-Promote to Queen</span>
+              <span className="text-[11px] text-parchment-400">Instantly promote pawns to queen without opening the promotion dialog</span>
+            </div>
+            <button
+              onClick={() => updateSettings({ autoQueenPromotion: !settings.autoQueenPromotion })}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                settings.autoQueenPromotion ? 'bg-brass-600' : 'bg-wood-950 border border-wood-800'
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
+                  settings.autoQueenPromotion ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-2 border-b border-wood-800">
+            <div>
+              <span className="text-xs font-bold text-parchment-200 block">Auto-Flip When Playing Black</span>
+              <span className="text-[11px] text-parchment-400">Automatically orient the board so your pieces are on the bottom</span>
+            </div>
+            <button
+              onClick={() => updateSettings({ autoFlipWhenBlack: !settings.autoFlipWhenBlack })}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                settings.autoFlipWhenBlack ? 'bg-brass-600' : 'bg-wood-950 border border-wood-800'
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
+                  settings.autoFlipWhenBlack ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <span className="text-xs font-bold text-parchment-200 block">Piece Animation Speed</span>
+              <span className="text-[11px] text-parchment-400">Transition animation duration for opponent moves and drags</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-wood-950 p-1 rounded-xl border border-wood-800">
+              {(['fast', 'normal', 'instant'] as const).map((spd) => {
+                const isSelected = (settings.animationSpeed || 'normal') === spd;
+                return (
+                  <button
+                    key={spd}
+                    onClick={() => updateSettings({ animationSpeed: spd })}
+                    className={`px-3 py-1 rounded-lg text-xs font-serif font-bold capitalize transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-brass-500/20 text-brass-400 border border-brass-500/40'
+                        : 'text-parchment-400 hover:text-parchment-200'
+                    }`}
+                  >
+                    {spd}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>

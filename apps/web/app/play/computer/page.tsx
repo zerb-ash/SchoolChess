@@ -22,11 +22,15 @@ export default function PlayComputerPage() {
 
   const [botLevel, setBotLevel] = useState(1);
   const [playerSide, setPlayerSide] = useState<'white' | 'black'>('white');
+  const [boardOrientation, setBoardOrientation] = useState<'white' | 'black'>('white');
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(() => chess.fen());
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [isBotThinking, setIsBotThinking] = useState(false);
   const [gameOver, setGameOver] = useState<{ result: string; reason: string } | null>(null);
+
+  const botTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isExecutingBotRef = useRef(false);
 
   const [evalResult, setEvalResult] = useState<PositionEvaluation>({
     score: 0,
@@ -35,10 +39,15 @@ export default function PlayComputerPage() {
     isCheckmate: false,
   });
 
-  const orientation = playerSide;
+  const orientation = boardOrientation;
   const turn = chess.turn();
   const isCheck = chess.inCheck();
   const isPlayerTurn = (playerSide === 'white' && turn === 'w') || (playerSide === 'black' && turn === 'b');
+
+  // Sync orientation with playerSide unless manually flipped
+  useEffect(() => {
+    setBoardOrientation(playerSide);
+  }, [playerSide]);
 
   // Evaluate position whenever FEN updates
   useEffect(() => {
@@ -59,11 +68,39 @@ export default function PlayComputerPage() {
 
   // Bot move trigger
   useEffect(() => {
-    if (gameOver || isPlayerTurn) return;
+    const currentTurn = chess.turn();
+    const isHumanTurn =
+      (playerSide === 'white' && currentTurn === 'w') ||
+      (playerSide === 'black' && currentTurn === 'b');
+
+    if (gameOver || isHumanTurn || isExecutingBotRef.current) {
+      return;
+    }
+
+    if (botTimerRef.current) {
+      clearTimeout(botTimerRef.current);
+    }
 
     setIsBotThinking(true);
-    const timer = setTimeout(() => {
+    botTimerRef.current = setTimeout(() => {
+      if (isExecutingBotRef.current || chess.isGameOver()) {
+        setIsBotThinking(false);
+        return;
+      }
+
+      isExecutingBotRef.current = true;
       try {
+        const turnNow = chess.turn();
+        const isStillBotTurn =
+          (playerSide === 'white' && turnNow === 'b') ||
+          (playerSide === 'black' && turnNow === 'w');
+
+        if (!isStillBotTurn) {
+          setIsBotThinking(false);
+          isExecutingBotRef.current = false;
+          return;
+        }
+
         const move = computeBotMove(chess.fen(), botLevel);
         const res = chess.move({
           from: move.from,
@@ -85,15 +122,20 @@ export default function PlayComputerPage() {
       } catch {
         // No legal moves
       } finally {
+        isExecutingBotRef.current = false;
         setIsBotThinking(false);
       }
-    }, 250);
+    }, 300);
 
-    return () => clearTimeout(timer);
-  }, [isPlayerTurn, gameOver, botLevel, chess]);
+    return () => {
+      if (botTimerRef.current) {
+        clearTimeout(botTimerRef.current);
+      }
+    };
+  }, [fen, playerSide, gameOver, botLevel, chess]);
 
   const handleMakeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
-    if (gameOver || !isPlayerTurn || isBotThinking) return;
+    if (gameOver || !isPlayerTurn || isBotThinking || isExecutingBotRef.current) return;
 
     try {
       const res = chess.move({
@@ -119,16 +161,32 @@ export default function PlayComputerPage() {
   };
 
   const getLegalMovesForSquare = (square: string): string[] => {
-    if (gameOver || !isPlayerTurn || isBotThinking) return [];
+    if (gameOver || !isPlayerTurn || isBotThinking || isExecutingBotRef.current) return [];
     return chess.moves({ square: square as any, verbose: true }).map((m) => m.to);
   };
 
   const handleRestart = () => {
+    if (botTimerRef.current) {
+      clearTimeout(botTimerRef.current);
+    }
+    isExecutingBotRef.current = false;
     chess.reset();
     setFen(chess.fen());
     setLastMove(null);
     setGameOver(null);
     setIsBotThinking(false);
+  };
+
+  const handleSwitchSide = () => {
+    if (isBotThinking || isExecutingBotRef.current) return;
+    if (botTimerRef.current) {
+      clearTimeout(botTimerRef.current);
+    }
+    setPlayerSide((prev) => (prev === 'white' ? 'black' : 'white'));
+  };
+
+  const handleToggleFlip = () => {
+    setBoardOrientation((prev) => (prev === 'white' ? 'black' : 'white'));
   };
 
   const handleResign = () => {
@@ -190,6 +248,7 @@ export default function PlayComputerPage() {
               showCoordinates={settings.showCoordinates}
               highlightLastMove={settings.highlightLastMove}
               highlightLegalMoves={settings.highlightLegalMoves}
+              autoQueen={settings.autoQueenPromotion}
               lastMove={lastMove}
               isCheck={isCheck}
               turn={turn}
@@ -216,14 +275,29 @@ export default function PlayComputerPage() {
             )}
           </div>
 
-          <button
-            onClick={() => setPlayerSide((prev) => (prev === 'white' ? 'black' : 'white'))}
-            className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 cursor-pointer"
-            title="Switch Side"
-          >
-            <ArrowUpDown className="w-3.5 h-3.5" />
-            <span className="text-[10px]">Switch Side</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleToggleFlip}
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 cursor-pointer transition-colors"
+              title="Flip Board View"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="text-[10px]">Flip</span>
+            </button>
+            <button
+              onClick={handleSwitchSide}
+              disabled={isBotThinking || !!gameOver}
+              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
+                isBotThinking || !!gameOver
+                  ? 'bg-wood-950 border-wood-900 text-parchment-600 cursor-not-allowed opacity-50'
+                  : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800 cursor-pointer'
+              }`}
+              title="Switch Side"
+            >
+              <ArrowUpDown className="w-3.5 h-3.5" />
+              <span className="text-[10px]">Switch Side</span>
+            </button>
+          </div>
         </div>
 
         {/* Game Over Banner */}

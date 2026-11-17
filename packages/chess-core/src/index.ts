@@ -130,5 +130,6 @@ export class ChessGameEngine {
 }
 
 export * from './bot-engine.js';
+export * from './fair-play.js';
 
 

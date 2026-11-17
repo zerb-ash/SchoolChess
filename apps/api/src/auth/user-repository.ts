@@ -20,6 +20,7 @@ export interface IUserRepository {
   findById(id: string): Promise<UserRecord | null>;
   createUser(username: string, passwordHash: string): Promise<UserRecord>;
   getUserRatings(userId: string): Promise<UserRatingSummary[]>;
+  getAllUsers?(): Promise<UserRecord[]>;
 }
 
 export class PostgresUserRepository implements IUserRepository {
@@ -161,6 +162,73 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async getUserRatings(userId: string): Promise<UserRatingSummary[]> {
     return this.ratings.get(userId) ?? [];
+  }
+
+  async getAllUsers(): Promise<UserRecord[]> {
+    return Array.from(this.users.values());
+  }
+}
+
+export class ResilientUserRepository implements IUserRepository {
+  private inMemory = new InMemoryUserRepository();
+  private useMemoryFallback = false;
+
+  constructor(private pgRepo?: PostgresUserRepository) {
+    if (!pgRepo) {
+      this.useMemoryFallback = true;
+    }
+  }
+
+  async findByUsername(username: string): Promise<UserRecord | null> {
+    if (this.useMemoryFallback || !this.pgRepo) {
+      return this.inMemory.findByUsername(username);
+    }
+    try {
+      return await this.pgRepo.findByUsername(username);
+    } catch {
+      this.useMemoryFallback = true;
+      return this.inMemory.findByUsername(username);
+    }
+  }
+
+  async findById(id: string): Promise<UserRecord | null> {
+    if (this.useMemoryFallback || !this.pgRepo) {
+      return this.inMemory.findById(id);
+    }
+    try {
+      return await this.pgRepo.findById(id);
+    } catch {
+      this.useMemoryFallback = true;
+      return this.inMemory.findById(id);
+    }
+  }
+
+  async createUser(username: string, passwordHash: string): Promise<UserRecord> {
+    if (this.useMemoryFallback || !this.pgRepo) {
+      return this.inMemory.createUser(username, passwordHash);
+    }
+    try {
+      return await this.pgRepo.createUser(username, passwordHash);
+    } catch {
+      this.useMemoryFallback = true;
+      return this.inMemory.createUser(username, passwordHash);
+    }
+  }
+
+  async getUserRatings(userId: string): Promise<UserRatingSummary[]> {
+    if (this.useMemoryFallback || !this.pgRepo) {
+      return this.inMemory.getUserRatings(userId);
+    }
+    try {
+      return await this.pgRepo.getUserRatings(userId);
+    } catch {
+      this.useMemoryFallback = true;
+      return this.inMemory.getUserRatings(userId);
+    }
+  }
+
+  async getAllUsers(): Promise<UserRecord[]> {
+    return this.inMemory.getAllUsers();
   }
 }
 

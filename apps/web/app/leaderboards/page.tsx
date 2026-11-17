@@ -1,37 +1,65 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Trophy, Medal, Flame, Zap, Clock, Crown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Trophy, Medal, Flame, Zap, Clock, Crown, Users } from 'lucide-react';
+
+interface LeaderboardEntry {
+  userId: string;
+  username: string;
+  rating: number;
+  provisional: boolean;
+  games: number;
+  winRate: string;
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function LeaderboardsPage() {
-  const [activeTab, setActiveTab] = useState<'site' | 'fide' | 'chess_com' | 'lichess'>('site');
+  const [activeTab, setActiveTab] = useState<'fide' | 'chess_com' | 'lichess'>('fide');
   const [activeCat, setActiveCat] = useState<'blitz' | 'rapid' | 'bullet'>('blitz');
+  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const mockLeaderboard = [
-    { rank: 1, username: 'GrandmasterOne', rating: 2850, games: 412, winRate: '68%' },
-    { rank: 2, username: 'ChessLegend', rating: 2740, games: 320, winRate: '64%' },
-    { rank: 3, username: 'KnightMaster', rating: 2680, games: 510, winRate: '61%' },
-    { rank: 4, username: 'BoardWizard', rating: 2590, games: 295, winRate: '59%' },
-    { rank: 5, username: 'QueenHunter', rating: 2520, games: 340, winRate: '57%' },
-    { rank: 6, username: 'TacticalHawk', rating: 2470, games: 215, winRate: '56%' },
-    { rank: 7, username: 'PawnPusher99', rating: 2410, games: 180, winRate: '55%' },
-    { rank: 8, username: 'EndgameAce', rating: 2380, games: 420, winRate: '54%' },
-  ];
+  useEffect(() => {
+    let isMounted = true;
+    setIsLoading(true);
+
+    fetch(`${API_BASE}/api/v1/leaderboards?system=${activeTab}&category=${activeCat}`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Failed to load');
+        return res.json();
+      })
+      .then((data) => {
+        if (isMounted) {
+          setEntries(data.entries || []);
+          setIsLoading(false);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setEntries([]);
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, activeCat]);
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-black text-white flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-amber-400" />
+        <h1 className="text-2xl font-serif font-bold text-parchment-100 flex items-center gap-2">
+          <Trophy className="w-5 h-5 text-brass-400" />
           <span>Competitive Leaderboards</span>
         </h1>
-        <p className="text-sm text-zinc-400">Top ranked players across all competitive rating pools</p>
+        <p className="text-xs text-parchment-400 mt-1">Player rankings across official rating pools</p>
       </div>
 
       {/* Rating System Tabs */}
-      <div className="flex border-b border-zinc-800 gap-2 overflow-x-auto pb-1">
+      <div className="flex border-b border-wood-800 gap-2 overflow-x-auto pb-1">
         {[
-          { id: 'site', label: 'Platform Ratings' },
           { id: 'fide', label: 'FIDE-style (Elo)' },
           { id: 'chess_com', label: 'Chess.com-style (Glicko-1)' },
           { id: 'lichess', label: 'Lichess-style (Glicko-2)' },
@@ -41,10 +69,10 @@ export default function LeaderboardsPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`py-3 px-4 font-bold text-xs whitespace-nowrap border-b-2 transition-all ${
+              className={`py-2.5 px-4 font-serif font-bold text-xs whitespace-nowrap border-b-2 transition-all cursor-pointer ${
                 isActive
-                  ? 'border-emerald-500 text-emerald-400'
-                  : 'border-transparent text-zinc-400 hover:text-zinc-200'
+                  ? 'border-brass-400 text-brass-400'
+                  : 'border-transparent text-parchment-400 hover:text-parchment-200'
               }`}
             >
               {tab.label}
@@ -53,7 +81,7 @@ export default function LeaderboardsPage() {
         })}
       </div>
 
-      {/* Category Pills */}
+      {/* Category Buttons */}
       <div className="flex items-center gap-2">
         {[
           { id: 'blitz', label: 'Blitz (3m, 5m)', icon: Flame },
@@ -66,61 +94,80 @@ export default function LeaderboardsPage() {
             <button
               key={cat.id}
               onClick={() => setActiveCat(cat.id as any)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all border cursor-pointer ${
                 isActive
-                  ? 'bg-zinc-800 border-zinc-600 text-zinc-100 shadow'
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
+                  ? 'bg-wood-800 border-brass-500/50 text-parchment-100 shadow'
+                  : 'bg-wood-950 border-wood-850 text-parchment-400 hover:text-parchment-200 hover:bg-wood-900'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-3.5 h-3.5 text-brass-400" />
               <span>{cat.label}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Table */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
-        <table className="w-full text-left text-xs sm:text-sm">
-          <thead className="bg-zinc-950/70 border-b border-zinc-800 text-zinc-400 uppercase font-semibold tracking-wider text-[11px]">
-            <tr>
-              <th className="py-3.5 px-4 w-16 text-center">Rank</th>
-              <th className="py-3.5 px-4">Player</th>
-              <th className="py-3.5 px-4">Rating</th>
-              <th className="py-3.5 px-4 hidden sm:table-cell">Games</th>
-              <th className="py-3.5 px-4 hidden sm:table-cell">Win Rate</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800/60 font-medium">
-            {mockLeaderboard.map((row) => (
-              <tr key={row.rank} className="hover:bg-zinc-800/40 transition-colors">
-                <td className="py-3.5 px-4 text-center font-bold">
-                  {row.rank === 1 ? (
-                    <Crown className="w-4 h-4 text-amber-400 mx-auto" />
-                  ) : row.rank === 2 ? (
-                    <Medal className="w-4 h-4 text-zinc-300 mx-auto" />
-                  ) : row.rank === 3 ? (
-                    <Medal className="w-4 h-4 text-amber-700 mx-auto" />
-                  ) : (
-                    <span className="text-zinc-500 font-mono">#{row.rank}</span>
-                  )}
-                </td>
-                <td className="py-3.5 px-4 font-bold text-zinc-200">{row.username}</td>
-                <td className="py-3.5 px-4 font-mono font-bold text-emerald-400 text-base">
-                  {row.rating}
-                </td>
-                <td className="py-3.5 px-4 text-zinc-400 font-mono hidden sm:table-cell">
-                  {row.games}
-                </td>
-                <td className="py-3.5 px-4 text-zinc-300 font-mono hidden sm:table-cell">
-                  {row.winRate}
-                </td>
+      {/* Table Card */}
+      <div className="bg-wood-900 border border-wood-800 rounded-2xl overflow-hidden shadow-xl">
+        {isLoading ? (
+          <div className="py-16 text-center text-xs text-parchment-500">
+            Loading leaderboard rankings...
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="py-20 flex flex-col items-center justify-center gap-3 text-center px-4">
+            <Users className="w-8 h-8 text-brass-500/50" />
+            <span className="font-serif font-bold text-sm text-parchment-300">
+              No users for this leaderboard
+            </span>
+            <span className="text-xs text-parchment-500 max-w-sm">
+              Rankings update automatically once rated competitive matches conclude.
+            </span>
+          </div>
+        ) : (
+          <table className="w-full text-left text-xs sm:text-sm">
+            <thead className="bg-wood-950 border-b border-wood-800 text-parchment-400 uppercase font-semibold tracking-wider text-[11px]">
+              <tr>
+                <th className="py-3 px-4 w-16 text-center">Rank</th>
+                <th className="py-3 px-4">Player</th>
+                <th className="py-3 px-4">Rating</th>
+                <th className="py-3 px-4 hidden sm:table-cell">Games</th>
+                <th className="py-3 px-4 hidden sm:table-cell">Win Rate</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-wood-800/60 font-medium">
+              {entries.map((row, idx) => {
+                const rank = idx + 1;
+                return (
+                  <tr key={row.userId} className="hover:bg-wood-850/50 transition-colors">
+                    <td className="py-3 px-4 text-center font-bold">
+                      {rank === 1 ? (
+                        <Crown className="w-4 h-4 text-brass-400 mx-auto" />
+                      ) : rank === 2 ? (
+                        <Medal className="w-4 h-4 text-parchment-300 mx-auto" />
+                      ) : rank === 3 ? (
+                        <Medal className="w-4 h-4 text-amber-600 mx-auto" />
+                      ) : (
+                        <span className="text-parchment-500 font-mono">#{rank}</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-parchment-100">{row.username}</td>
+                    <td className="py-3 px-4 font-mono font-bold text-brass-400 text-sm">
+                      {row.rating}
+                      {row.provisional && <span className="text-[10px] text-parchment-500 font-normal ml-1">?</span>}
+                    </td>
+                    <td className="py-3 px-4 text-parchment-400 font-mono hidden sm:table-cell">
+                      {row.games}
+                    </td>
+                    <td className="py-3 px-4 text-parchment-300 font-mono hidden sm:table-cell">
+                      {row.winRate}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
 }
-

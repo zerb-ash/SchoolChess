@@ -15,6 +15,7 @@ export interface ChessboardProps {
   lastMove?: { from: string; to: string } | null;
   isCheck?: boolean;
   turn?: 'w' | 'b';
+  autoQueen?: boolean;
   onMakeMove?: (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => void;
   getLegalMovesForSquare?: (square: string) => string[];
   disabled?: boolean;
@@ -52,6 +53,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   lastMove = null,
   isCheck = false,
   turn = 'w',
+  autoQueen = false,
   onMakeMove,
   getLegalMovesForSquare,
   disabled = false,
@@ -59,12 +61,9 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
 
-  // Drag and drop state
   const [dragState, setDragState] = useState<{
     piece: PieceSymbol;
     fromSquare: string;
-    startX: number;
-    startY: number;
     currX: number;
     currY: number;
     hasMoved: boolean;
@@ -72,6 +71,12 @@ export const Chessboard: React.FC<ChessboardProps> = ({
 
   const [hoveredSquare, setHoveredSquare] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  const pointerDownRef = useRef<{
+    startX: number;
+    startY: number;
+    square: string;
+    piece: PieceSymbol | null;
+  } | null>(null);
 
   const boardMatrix = useMemo(() => parseFenBoard(fen), [fen]);
 
@@ -136,6 +141,12 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     const movingPiece = boardMatrix[rankIdx][fileIdx];
 
     if (movingPiece && movingPiece.endsWith('P') && (isWhitePawn || isBlackPawn)) {
+      if (autoQueen) {
+        executeMove(from, to, 'q');
+        setSelectedSquare(null);
+        setHoveredSquare(null);
+        return true;
+      }
       setPendingPromotion({ from, to });
       return true;
     }
@@ -146,9 +157,11 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     return true;
   };
 
-  // Click to move handler
-  const handleSquareClick = (square: string, piece: PieceSymbol | null) => {
-    if (disabled || pendingPromotion || dragState?.hasMoved) return;
+  const handleTapSquare = (square: string) => {
+    if (disabled || pendingPromotion || !square) return;
+
+    const [fileIdx, rankIdx] = getIndicesFromSquare(square);
+    const piece = boardMatrix[rankIdx]?.[fileIdx] ?? null;
 
     if (selectedSquare) {
       if (selectedSquare === square) {
@@ -158,71 +171,91 @@ export const Chessboard: React.FC<ChessboardProps> = ({
       if (tryMove(selectedSquare, square)) {
         return;
       }
+      if (piece && piece.startsWith(turn)) {
+        setSelectedSquare(square);
+        return;
+      }
+      setSelectedSquare(null);
+      return;
     }
 
     if (piece && piece.startsWith(turn)) {
       setSelectedSquare(square);
-    } else {
-      setSelectedSquare(null);
     }
   };
 
-  // Pointer Down (Drag Start - Mouse, Touchscreen Laptop, Mobile)
   const handlePointerDown = (e: React.PointerEvent, square: string, piece: PieceSymbol | null) => {
-    if (disabled || pendingPromotion || !piece || !piece.startsWith(turn)) return;
+    if (disabled || pendingPromotion) return;
 
-    e.preventDefault();
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-
-    setDragState({
-      piece,
-      fromSquare: square,
+    pointerDownRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      currX: e.clientX,
-      currY: e.clientY,
-      hasMoved: false,
-    });
-    setSelectedSquare(square);
-    setHoveredSquare(square);
+      square,
+      piece,
+    };
+
+    if (piece && piece.startsWith(turn)) {
+      setDragState({
+        piece,
+        fromSquare: square,
+        currX: e.clientX,
+        currY: e.clientY,
+        hasMoved: false,
+      });
+      setSelectedSquare(square);
+      setHoveredSquare(square);
+    }
   };
 
-  // Pointer Move (Drag Move)
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!dragState) return;
+    const down = pointerDownRef.current;
+    if (!down) return;
 
-    const dist = Math.hypot(e.clientX - dragState.startX, e.clientY - dragState.startY);
-    const hasMoved = dragState.hasMoved || dist > 6;
+    const dist = Math.hypot(e.clientX - down.startX, e.clientY - down.startY);
+    const hasMoved = dist > 6;
 
-    setDragState((prev) =>
-      prev ? { ...prev, currX: e.clientX, currY: e.clientY, hasMoved } : null
-    );
+    if (hasMoved && down.piece && down.piece.startsWith(turn)) {
+      setDragState({
+        piece: down.piece,
+        fromSquare: down.square,
+        currX: e.clientX,
+        currY: e.clientY,
+        hasMoved: true,
+      });
 
-    const hovered = getSquareFromCoords(e.clientX, e.clientY);
-    setHoveredSquare(hovered);
+      const hovered = getSquareFromCoords(e.clientX, e.clientY);
+      setHoveredSquare(hovered);
+    }
   };
 
-  // Pointer Up (Drop Piece)
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!dragState) return;
+    const down = pointerDownRef.current;
+    pointerDownRef.current = null;
 
-    const fromSquare = dragState.fromSquare;
-    const hasMoved = dragState.hasMoved;
-    const targetSquare = getSquareFromCoords(e.clientX, e.clientY);
+    if (!down) return;
 
-    setDragState(null);
-    setHoveredSquare(null);
+    const targetSquare = getSquareFromCoords(e.clientX, e.clientY) || down.square;
 
-    if (hasMoved && targetSquare && targetSquare !== fromSquare) {
-      if (!tryMove(fromSquare, targetSquare)) {
+    if (dragState && dragState.hasMoved) {
+      setDragState(null);
+      setHoveredSquare(null);
+
+      if (targetSquare && targetSquare !== dragState.fromSquare) {
+        if (!tryMove(dragState.fromSquare, targetSquare)) {
+          setSelectedSquare(null);
+        }
+      } else {
         setSelectedSquare(null);
       }
-    } else if (!hasMoved) {
-      // Tap without drag: square click handles selection
+    } else {
+      setDragState(null);
+      setHoveredSquare(null);
+      handleTapSquare(targetSquare);
     }
   };
 
   const handlePointerCancel = () => {
+    pointerDownRef.current = null;
     setDragState(null);
     setHoveredSquare(null);
   };
@@ -257,7 +290,6 @@ export const Chessboard: React.FC<ChessboardProps> = ({
             return (
               <div
                 key={square}
-                onClick={() => handleSquareClick(square, piece)}
                 onPointerDown={(e) => handlePointerDown(e, square, piece)}
                 style={{ backgroundColor: bg }}
                 className="chess-square group relative transition-colors duration-75 select-none"
