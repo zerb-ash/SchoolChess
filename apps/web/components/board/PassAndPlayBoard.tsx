@@ -29,7 +29,7 @@ const PIECE_VALUES: Record<string, number> = {
 };
 
 export const PassAndPlayBoard: React.FC = () => {
-  const { themeColors, settings } = useAppSettings();
+  const { currentThemeColors: themeColors, settings } = useAppSettings();
   const [chess] = useState(() => new Chess());
   const [history, setHistory] = useState<PositionSnapshot[]>([{ fen: chess.fen() }]);
   const [viewIndex, setViewIndex] = useState(0);
@@ -344,20 +344,20 @@ export const PassAndPlayBoard: React.FC = () => {
 
         {/* Draw Offer Banner */}
         {drawOffer && !isGameOver && (
-          <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-700 flex flex-col gap-2">
-            <span className="text-xs font-semibold text-zinc-200 text-center">
+          <div className="p-3 rounded-xl bg-wood-900 border border-brass-500/30 flex flex-col gap-2">
+            <span className="text-xs font-semibold text-parchment-200 text-center">
               Opponent offered a draw. Accept?
             </span>
             <div className="flex gap-2">
               <button
                 onClick={handleAcceptDraw}
-                className="flex-1 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black rounded-lg text-xs font-bold"
+                className="flex-1 py-1.5 bg-brass-600 hover:bg-brass-500 text-wood-950 rounded-lg text-xs font-bold"
               >
                 Accept Draw
               </button>
               <button
                 onClick={() => setDrawOffer(false)}
-                className="flex-1 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold"
+                className="flex-1 py-1.5 bg-wood-850 hover:bg-wood-800 text-parchment-300 rounded-lg text-xs font-bold"
               >
                 Decline
               </button>
@@ -366,14 +366,14 @@ export const PassAndPlayBoard: React.FC = () => {
         )}
 
         {/* Move History Table */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-xl flex flex-col h-[300px]">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+        <div className="bg-wood-900 border border-wood-800 rounded-xl p-4 shadow-xl flex flex-col h-[300px]">
+          <h3 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-400 mb-2">
             Move History
           </h3>
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-1 font-mono text-xs">
             {history.length <= 1 ? (
-              <p className="text-zinc-600 italic text-center py-10">Moves will appear here...</p>
+              <p className="text-parchment-500 italic text-center py-10">Moves will appear here...</p>
             ) : (
               <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                 {Array.from({ length: Math.ceil((history.length - 1) / 2) }).map((_, i) => {
@@ -388,11 +388,11 @@ export const PassAndPlayBoard: React.FC = () => {
                         onClick={() => setViewIndex(whiteIdx)}
                         className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
                           viewIndex === whiteIdx
-                            ? 'bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30'
-                            : 'bg-zinc-800/40 text-zinc-300 hover:bg-zinc-800'
+                            ? 'bg-brass-500/20 text-brass-300 font-bold border border-brass-500/40'
+                            : 'bg-wood-950 text-parchment-300 hover:bg-wood-850'
                         }`}
                       >
-                        <span className="text-zinc-500 w-4 text-right">{i + 1}.</span>
+                        <span className="text-parchment-500 w-4 text-right">{i + 1}.</span>
                         <span>{whiteSnap?.san}</span>
                       </button>
                       {blackSnap ? (
@@ -400,14 +400,14 @@ export const PassAndPlayBoard: React.FC = () => {
                           onClick={() => setViewIndex(blackIdx)}
                           className={`flex items-center gap-2 p-1.5 rounded text-left transition-colors ${
                             viewIndex === blackIdx
-                              ? 'bg-emerald-500/20 text-emerald-400 font-bold border border-emerald-500/30'
-                              : 'bg-zinc-800/40 text-zinc-300 hover:bg-zinc-800'
+                              ? 'bg-brass-500/20 text-brass-300 font-bold border border-brass-500/40'
+                              : 'bg-wood-950 text-parchment-300 hover:bg-wood-850'
                           }`}
                         >
                           <span>{blackSnap.san}</span>
                         </button>
                       ) : (
-                        <div className="p-1.5 text-zinc-600">...</div>
+                        <div className="p-1.5 text-parchment-500">...</div>
                       )}
                     </React.Fragment>
                   );
@@ -422,9 +422,9 @@ export const PassAndPlayBoard: React.FC = () => {
           <button
             onClick={() => setDrawOffer(true)}
             disabled={isGameOver || isViewingHistory}
-            className="py-2.5 px-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-40"
+            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-40"
           >
-            <Handshake className="w-4 h-4 text-zinc-400" />
+            <Handshake className="w-4 h-4 text-brass-500" />
             <span>Offer Draw</span>
           </button>
 
@@ -433,19 +433,19 @@ export const PassAndPlayBoard: React.FC = () => {
             disabled={isGameOver || isViewingHistory}
             className={`py-2.5 px-2 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-40 ${
               confirmResign
-                ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse'
-                : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
+                ? 'bg-salon-crimson/30 border-salon-crimson text-red-200 animate-pulse'
+                : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800'
             }`}
           >
-            <Flag className="w-4 h-4 text-zinc-400" />
+            <Flag className="w-4 h-4 text-salon-crimson" />
             <span>{confirmResign ? 'Confirm?' : 'Resign'}</span>
           </button>
 
           <button
             onClick={() => setIsFenPgnModalOpen(true)}
-            className="py-2.5 px-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors"
+            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors"
           >
-            <FileText className="w-4 h-4 text-zinc-400" />
+            <FileText className="w-4 h-4 text-brass-500" />
             <span>FEN / PGN</span>
           </button>
         </div>

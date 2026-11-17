@@ -28,14 +28,15 @@ test('AuthoritativeClock - monotonic move deduction and turn alternation', () =>
   assert.equal(timeoutTriggered, false);
 });
 
-test('AuthoritativeClock - triggers timeout callback when time expires', (t, done) => {
-  const clock = new AuthoritativeClock(40, 0, (loser) => {
-    assert.equal(loser, 'w');
-    clock.stop();
-    done();
+test('AuthoritativeClock - triggers timeout callback when time expires', async () => {
+  await new Promise<void>((resolve) => {
+    const clock = new AuthoritativeClock(30, 0, (loser) => {
+      assert.equal(loser, 'w');
+      clock.stop();
+      resolve();
+    });
+    clock.start();
   });
-
-  clock.start();
 });
 
 test('GameRoom - move validation and sequence lock', () => {

@@ -170,7 +170,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
 
                 {/* Selected square highlight */}
                 {isSelected && (
-                  <div className="absolute inset-0 bg-emerald-400/40 border-2 border-emerald-400 pointer-events-none" />
+                  <div className="absolute inset-0 bg-brass-500/35 border-2 border-brass-400 pointer-events-none" />
                 )}
 
                 {/* Check alert on King */}
@@ -207,9 +207,9 @@ export const Chessboard: React.FC<ChessboardProps> = ({
                 {isDestination && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     {piece ? (
-                      <div className="w-4/5 h-4/5 rounded-full border-4 border-emerald-400/80 animate-scale" />
+                      <div className="w-4/5 h-4/5 rounded-full border-4 border-brass-400/90 animate-scale" />
                     ) : (
-                      <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-emerald-500/80 shadow-md" />
+                      <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-brass-500/85 shadow-md" />
                     )}
                   </div>
                 )}

@@ -19,6 +19,7 @@ export class RoomManager {
   public removeRoom(gameId: string): void {
     const room = this.rooms.get(gameId);
     if (room) {
+      room.destroy();
       this.rooms.delete(gameId);
     }
   }

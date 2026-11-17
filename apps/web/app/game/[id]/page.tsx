@@ -13,7 +13,7 @@ export default function LiveGamePage() {
   const params = useParams();
   const gameId = (params?.id as string) || 'default-room';
 
-  const { themeColors, settings } = useAppSettings();
+  const { currentThemeColors: themeColors, settings } = useAppSettings();
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(() => chess.fen());
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
@@ -197,22 +197,22 @@ export default function LiveGamePage() {
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
-                orientation === 'white' ? 'bg-white' : 'bg-zinc-800 border border-zinc-600'
+                orientation === 'white' ? 'bg-parchment-100 shadow' : 'bg-wood-950 border border-brass-500/40'
               }`}
             />
-            <span className="text-xs font-bold text-zinc-300">
-              {orientation === 'white' ? 'You (White)' : 'Opponent (Black)'}
+            <span className="text-xs font-serif font-bold text-parchment-200">
+              {orientation === 'white' ? 'White' : 'Black'}
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono font-bold text-zinc-200">
-              <Clock className="w-3.5 h-3.5 text-zinc-400" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-wood-900 border border-wood-800 text-xs font-mono font-bold text-parchment-100 shadow-inner">
+              <Clock className="w-3.5 h-3.5 text-brass-400" />
               <span>{formatClock(orientation === 'white' ? whiteClockMs : blackClockMs)}</span>
             </div>
             <button
               onClick={() => setOrientation((prev) => (prev === 'white' ? 'black' : 'white'))}
-              className="p-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs flex items-center gap-1"
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 transition-colors"
               title="Flip Board"
             >
               <ArrowUpDown className="w-3.5 h-3.5" />
@@ -222,9 +222,9 @@ export default function LiveGamePage() {
 
         {/* Game Over Banner */}
         {gameOverData && (
-          <div className="w-full mt-4 p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-center flex items-center justify-center gap-3 animate-fade-in shadow-xl">
-            <Trophy className="w-5 h-5 text-emerald-400" />
-            <span className="font-bold text-emerald-200 text-sm">
+          <div className="w-full mt-4 p-4 rounded-xl bg-wood-900 border border-brass-500/40 text-center flex items-center justify-center gap-3 animate-fadeIn shadow-2xl">
+            <Trophy className="w-5 h-5 text-brass-400" />
+            <span className="font-serif font-bold text-parchment-100 text-sm">
               Game Over: {gameOverData.result} ({gameOverData.termination})
             </span>
           </div>
@@ -234,46 +234,46 @@ export default function LiveGamePage() {
       {/* Right Column: Move History & Multi-tab Status */}
       <div className="w-full lg:w-80 flex flex-col gap-4">
         {/* Connection Status Card */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 shadow flex items-center justify-between text-xs">
+        <div className="bg-wood-900 border border-wood-800 rounded-xl p-3 shadow-md flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <div
               className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'
+                isConnected ? 'bg-brass-400 animate-pulse' : 'bg-salon-crimson'
               }`}
             />
-            <span className="text-zinc-300 font-semibold">
-              {isConnected ? 'Connected' : 'Connecting...'}
+            <span className="text-parchment-300 font-medium">
+              {isConnected ? 'Authoritative Sync Active' : 'Connecting...'}
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-[10px] text-zinc-400 font-mono">
-            <ShieldCheck className="w-3 h-3 text-emerald-400" />
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-wood-950 border border-wood-800 text-[10px] text-parchment-400 font-mono">
+            <ShieldCheck className="w-3 h-3 text-brass-400" />
             <span>Tab: {tabRole}</span>
           </div>
         </div>
 
         {/* Move History */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 shadow-xl flex flex-col h-[300px]">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+        <div className="bg-wood-900 border border-wood-800 rounded-xl p-4 shadow-xl flex flex-col h-[300px]">
+          <h3 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-400 mb-2">
             Move History ({Math.ceil(moveHistory.length / 2)})
           </h3>
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-1 font-mono text-xs">
             {moveHistory.length === 0 ? (
-              <p className="text-zinc-600 italic text-center py-10">Moves will appear here...</p>
+              <p className="text-parchment-500 italic text-center py-10">Moves will appear here...</p>
             ) : (
               <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                 {Array.from({ length: Math.ceil(moveHistory.length / 2) }).map((_, i) => (
                   <React.Fragment key={i}>
-                    <div className="flex items-center gap-2 p-1 rounded bg-zinc-800/40">
-                      <span className="text-zinc-500 w-4 text-right">{i + 1}.</span>
-                      <span className="text-zinc-200 font-semibold">{moveHistory[i * 2]}</span>
+                    <div className="flex items-center gap-2 p-1.5 rounded bg-wood-950 text-parchment-300">
+                      <span className="text-parchment-500 w-4 text-right">{i + 1}.</span>
+                      <span className="text-parchment-100 font-semibold">{moveHistory[i * 2]}</span>
                     </div>
-                    <div className="flex items-center gap-2 p-1 rounded bg-zinc-800/40">
+                    <div className="flex items-center gap-2 p-1.5 rounded bg-wood-950 text-parchment-300">
                       {moveHistory[i * 2 + 1] ? (
-                        <span className="text-zinc-200 font-semibold">{moveHistory[i * 2 + 1]}</span>
+                        <span className="text-parchment-100 font-semibold">{moveHistory[i * 2 + 1]}</span>
                       ) : (
-                        <span className="text-zinc-600">...</span>
+                        <span className="text-parchment-500">...</span>
                       )}
                     </div>
                   </React.Fragment>
@@ -288,9 +288,9 @@ export default function LiveGamePage() {
           <button
             onClick={handleDrawOffer}
             disabled={isGameOver || !isConnected}
-            className="py-2.5 px-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-300 rounded-xl border border-zinc-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
           >
-            <Handshake className="w-4 h-4 text-zinc-400" />
+            <Handshake className="w-4 h-4 text-brass-500" />
             <span>Offer Draw</span>
           </button>
 
@@ -299,11 +299,11 @@ export default function LiveGamePage() {
             disabled={isGameOver || !isConnected}
             className={`py-2.5 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 ${
               confirmResign
-                ? 'bg-red-500/20 border-red-500 text-red-400 animate-pulse'
-                : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800'
+                ? 'bg-salon-crimson/30 border-salon-crimson text-red-200 animate-pulse'
+                : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800'
             }`}
           >
-            <Flag className="w-4 h-4 text-zinc-400" />
+            <Flag className="w-4 h-4 text-salon-crimson" />
             <span>{confirmResign ? 'Confirm?' : 'Resign'}</span>
           </button>
         </div>

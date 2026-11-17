@@ -8,15 +8,14 @@ export interface BoardThemeColors {
 }
 
 export const PRESET_THEMES: Record<string, BoardThemeColors> = {
-  brown: { light: '#f0d9b5', dark: '#b58863' },
-  green: { light: '#eeeed2', dark: '#769656' },
-  blue: { light: '#dee3e6', dark: '#8ca2ad' },
-  purple: { light: '#f8f8f2', dark: '#6272a4' },
-  dark: { light: '#a3a3a3', dark: '#404040' },
+  walnut: { light: '#f0d9b5', dark: '#b58863' },
+  classic_salon: { light: '#ede3d1', dark: '#8a6240' },
+  tournament: { light: '#eeeed2', dark: '#5b7c4b' },
+  obsidian: { light: '#e2d9c8', dark: '#3a332d' },
 };
 
 export interface AppSettings {
-  themeName: 'brown' | 'green' | 'blue' | 'purple' | 'dark' | 'custom';
+  themeName: 'walnut' | 'classic_salon' | 'tournament' | 'obsidian' | 'custom';
   customLight: string;
   customDark: string;
   showCoordinates: boolean;
@@ -27,9 +26,9 @@ export interface AppSettings {
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
-  themeName: 'green',
-  customLight: '#E8EDF2',
-  customDark: '#64748B',
+  themeName: 'walnut',
+  customLight: '#f0d9b5',
+  customDark: '#b58863',
   showCoordinates: true,
   highlightLastMove: true,
   highlightLegalMoves: true,
@@ -61,24 +60,22 @@ export function useAppSettings() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch {
-        // LocalStorage fallback
+        // LocalStorage quota or disabled
       }
       return next;
     });
   };
 
-  const getThemeColors = (): BoardThemeColors => {
-    if (settings.themeName === 'custom') {
-      return { light: settings.customLight, dark: settings.customDark };
-    }
-    return PRESET_THEMES[settings.themeName] || PRESET_THEMES.green;
-  };
+  const currentThemeColors: BoardThemeColors =
+    settings.themeName === 'custom'
+      ? { light: settings.customLight, dark: settings.customDark }
+      : PRESET_THEMES[settings.themeName] || PRESET_THEMES.walnut;
 
   return {
     settings,
     updateSettings,
-    themeColors: getThemeColors(),
+    currentThemeColors,
+    themeColors: currentThemeColors,
     isLoaded,
   };
 }
-

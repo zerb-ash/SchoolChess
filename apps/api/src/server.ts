@@ -3,6 +3,8 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import url from 'node:url';
 import { registerAuthRoutes } from './routes/auth.js';
+import { challengesRoutes } from './routes/challenges.js';
+import { matchmakingRoutes } from './routes/matchmaking.js';
 import { IUserRepository, InMemoryUserRepository, PostgresUserRepository } from './auth/user-repository.js';
 import { createDatabaseClient } from '@schoolchess/database';
 
@@ -37,6 +39,9 @@ export function buildServer(userRepo?: IUserRepository) {
     { prefix: '/api/v1/auth' }
   );
 
+  app.register(challengesRoutes);
+  app.register(matchmakingRoutes);
+
   return app;
 }
 
@@ -50,6 +55,6 @@ if (isMainModule || process.env.START_SERVER === 'true') {
       console.error(err);
       process.exit(1);
     }
-    console.log(`SchoolChess API running on ${address}`);
+    console.log(`SchoolChess API server running on ${address}`);
   });
 }

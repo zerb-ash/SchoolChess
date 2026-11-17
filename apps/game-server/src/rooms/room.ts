@@ -251,5 +251,10 @@ export class GameRoom {
       ws.send(JSON.stringify(msg));
     }
   }
+
+  public destroy(): void {
+    this.clock.stop();
+    this.sockets.clear();
+  }
 }
 
