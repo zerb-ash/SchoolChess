@@ -6,6 +6,10 @@ export interface UserRecord {
   username: string;
   passwordHash: string;
   createdAt: Date;
+  bio?: string;
+  avatarUrl?: string;
+  views?: number;
+  lastSeenAt?: Date;
 }
 
 export interface UserRatingSummary {
@@ -15,12 +19,34 @@ export interface UserRatingSummary {
   provisional: boolean;
 }
 
+export interface CompletedGameRecord {
+  id: string;
+  timeControl: string;
+  category: string;
+  whiteUserId: string;
+  whiteUsername: string;
+  whiteRating: number;
+  blackUserId: string;
+  blackUsername: string;
+  blackRating: number;
+  result: '1-0' | '0-1' | '1/2-1/2';
+  termination: string;
+  movesCount: number;
+  accuracyWhite?: number;
+  accuracyBlack?: number;
+  playedAt: Date;
+}
+
 export interface IUserRepository {
   findByUsername(username: string): Promise<UserRecord | null>;
   findById(id: string): Promise<UserRecord | null>;
   createUser(username: string, passwordHash: string): Promise<UserRecord>;
   getUserRatings(userId: string): Promise<UserRatingSummary[]>;
   getAllUsers?(): Promise<UserRecord[]>;
+  updateProfile?(userId: string, data: { bio?: string; avatarUrl?: string }): Promise<UserRecord | null>;
+  incrementViews?(userId: string): Promise<number>;
+  recordGame?(game: CompletedGameRecord): Promise<void>;
+  getUserGames?(userId: string): Promise<CompletedGameRecord[]>;
 }
 
 export class PostgresUserRepository implements IUserRepository {
@@ -112,6 +138,7 @@ export class PostgresUserRepository implements IUserRepository {
 export class InMemoryUserRepository implements IUserRepository {
   private users = new Map<string, UserRecord>();
   private ratings = new Map<string, UserRatingSummary[]>();
+  private games: CompletedGameRecord[] = [];
 
   async findByUsername(username: string): Promise<UserRecord | null> {
     const target = username.toLowerCase();
@@ -137,6 +164,10 @@ export class InMemoryUserRepository implements IUserRepository {
       username,
       passwordHash,
       createdAt: new Date(),
+      bio: '',
+      avatarUrl: '',
+      views: 0,
+      lastSeenAt: new Date(),
     };
 
     this.users.set(id, record);
@@ -166,6 +197,32 @@ export class InMemoryUserRepository implements IUserRepository {
 
   async getAllUsers(): Promise<UserRecord[]> {
     return Array.from(this.users.values());
+  }
+
+  async updateProfile(userId: string, data: { bio?: string; avatarUrl?: string }): Promise<UserRecord | null> {
+    const user = this.users.get(userId);
+    if (!user) return null;
+    if (data.bio !== undefined) user.bio = data.bio;
+    if (data.avatarUrl !== undefined) user.avatarUrl = data.avatarUrl;
+    user.lastSeenAt = new Date();
+    return user;
+  }
+
+  async incrementViews(userId: string): Promise<number> {
+    const user = this.users.get(userId);
+    if (!user) return 0;
+    user.views = (user.views || 0) + 1;
+    return user.views;
+  }
+
+  async recordGame(game: CompletedGameRecord): Promise<void> {
+    this.games.unshift(game);
+  }
+
+  async getUserGames(userId: string): Promise<CompletedGameRecord[]> {
+    return this.games.filter(
+      (g) => g.whiteUserId === userId || g.blackUserId === userId
+    );
   }
 }
 
@@ -229,6 +286,22 @@ export class ResilientUserRepository implements IUserRepository {
 
   async getAllUsers(): Promise<UserRecord[]> {
     return this.inMemory.getAllUsers();
+  }
+
+  async updateProfile(userId: string, data: { bio?: string; avatarUrl?: string }): Promise<UserRecord | null> {
+    return this.inMemory.updateProfile(userId, data);
+  }
+
+  async incrementViews(userId: string): Promise<number> {
+    return this.inMemory.incrementViews(userId);
+  }
+
+  async recordGame(game: CompletedGameRecord): Promise<void> {
+    return this.inMemory.recordGame(game);
+  }
+
+  async getUserGames(userId: string): Promise<CompletedGameRecord[]> {
+    return this.inMemory.getUserGames(userId);
   }
 }
 

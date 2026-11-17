@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Crown, Play, Swords, Trophy, Settings, LogOut, UserPlus, LogIn, ChevronDown, Bot } from 'lucide-react';
+import { Crown, Play, Swords, Trophy, Settings, LogOut, UserPlus, LogIn, ChevronDown, Bot, User } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -38,7 +38,7 @@ export const Navbar: React.FC = () => {
               <Crown className="w-5 h-5 text-brass-400 group-hover:scale-105 transition-transform" />
             </div>
             <span className="font-serif text-lg font-bold tracking-wider text-parchment-100 group-hover:text-brass-300 transition-colors">
-              School<span className="text-brass-400 font-normal">Chess</span>
+              X<span className="text-brass-400 font-normal">Chess</span>
             </span>
           </Link>
 
@@ -86,8 +86,16 @@ export const Navbar: React.FC = () => {
                   <div className="absolute right-0 mt-2 w-48 rounded-xl bg-wood-900 border border-brass-500/20 shadow-xl shadow-black/80 py-1.5 z-50 animate-fadeIn text-xs">
                     <div className="px-3 py-2 border-b border-wood-800 text-parchment-400">
                       <div className="text-[10px] uppercase tracking-wider text-parchment-500">Signed in as</div>
-                      <div className="font-semibold text-parchment-100 truncate">{user.username}</div>
+                      <div className="font-semibold text-parchment-100 truncate">@{user.username}</div>
                     </div>
+                    <Link
+                      href={`/profile/@${user.username}`}
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 text-parchment-300 hover:text-parchment-100 hover:bg-wood-850 transition-colors"
+                    >
+                      <User className="w-4 h-4 text-brass-500" />
+                      <span>Profile</span>
+                    </Link>
                     <Link
                       href="/settings"
                       onClick={() => setDropdownOpen(false)}

@@ -165,7 +165,7 @@ export default function PlayComputerPage() {
     return chess.moves({ square: square as any, verbose: true }).map((m) => m.to);
   };
 
-  const handleRestart = () => {
+  const handleStartNewGame = (side: 'white' | 'black') => {
     if (botTimerRef.current) {
       clearTimeout(botTimerRef.current);
     }
@@ -175,14 +175,12 @@ export default function PlayComputerPage() {
     setLastMove(null);
     setGameOver(null);
     setIsBotThinking(false);
+    setPlayerSide(side);
+    setBoardOrientation(side);
   };
 
-  const handleSwitchSide = () => {
-    if (isBotThinking || isExecutingBotRef.current) return;
-    if (botTimerRef.current) {
-      clearTimeout(botTimerRef.current);
-    }
-    setPlayerSide((prev) => (prev === 'white' ? 'black' : 'white'));
+  const handleRestart = () => {
+    handleStartNewGame(playerSide);
   };
 
   const handleToggleFlip = () => {
@@ -275,29 +273,14 @@ export default function PlayComputerPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleToggleFlip}
-              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 cursor-pointer transition-colors"
-              title="Flip Board View"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span className="text-[10px]">Flip</span>
-            </button>
-            <button
-              onClick={handleSwitchSide}
-              disabled={isBotThinking || !!gameOver}
-              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-colors ${
-                isBotThinking || !!gameOver
-                  ? 'bg-wood-950 border-wood-900 text-parchment-600 cursor-not-allowed opacity-50'
-                  : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800 cursor-pointer'
-              }`}
-              title="Switch Side"
-            >
-              <ArrowUpDown className="w-3.5 h-3.5" />
-              <span className="text-[10px]">Switch Side</span>
-            </button>
-          </div>
+          <button
+            onClick={handleToggleFlip}
+            className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+            title="Flip Board View"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span className="text-[10px]">Flip Board</span>
+          </button>
         </div>
 
         {/* Game Over Banner */}
@@ -370,6 +353,35 @@ export default function PlayComputerPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Play As Side Selection */}
+        <div className="bg-wood-900 border border-wood-800 rounded-2xl p-4 shadow-xl flex flex-col gap-2.5">
+          <span className="text-[11px] font-serif font-bold uppercase tracking-wider text-parchment-400">Play As</span>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleStartNewGame('white')}
+              className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                playerSide === 'white'
+                  ? 'border-brass-400 bg-wood-850 text-parchment-100 shadow'
+                  : 'border-wood-800 bg-wood-950 text-parchment-400 hover:text-parchment-200'
+              }`}
+            >
+              <div className="w-3.5 h-3.5 rounded-full bg-parchment-100 shadow border border-wood-700" />
+              <span>White</span>
+            </button>
+            <button
+              onClick={() => handleStartNewGame('black')}
+              className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                playerSide === 'black'
+                  ? 'border-brass-400 bg-wood-850 text-parchment-100 shadow'
+                  : 'border-wood-800 bg-wood-950 text-parchment-400 hover:text-parchment-200'
+              }`}
+            >
+              <div className="w-3.5 h-3.5 rounded-full bg-wood-950 border border-brass-500/40" />
+              <span>Black</span>
+            </button>
           </div>
         </div>
 

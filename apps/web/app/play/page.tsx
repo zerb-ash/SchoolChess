@@ -236,8 +236,8 @@ export default function PlayPage() {
               <Bot className="w-5 h-5" />
               <h3 className="font-serif text-lg text-parchment-100">Play Computer</h3>
             </div>
-            <p className="text-xs text-parchment-400 leading-relaxed">
-              Challenge bots across 5 difficulty levels from Beginner (200 Elo) to Master (2000 Elo) with live evaluation.
+            <p className="text-xs text-parchment-400">
+              Play against bots from 200 to 2000 Elo.
             </p>
           </div>
           <Link
@@ -255,8 +255,8 @@ export default function PlayPage() {
               <Swords className="w-5 h-5" />
               <h3 className="font-serif text-lg text-parchment-100">Private Match</h3>
             </div>
-            <p className="text-xs text-parchment-400 leading-relaxed">
-              Create a custom game with a shareable link or a 6-digit room code.
+            <p className="text-xs text-parchment-400">
+              Play with a friend via link or 6-digit code.
             </p>
           </div>
           <button
@@ -274,8 +274,8 @@ export default function PlayPage() {
               <KeyRound className="w-5 h-5" />
               <h3 className="font-serif text-lg text-parchment-100">Join by Room Code</h3>
             </div>
-            <p className="text-xs text-parchment-400 leading-relaxed">
-              Enter a 6-character room code from an opponent or classroom teacher.
+            <p className="text-xs text-parchment-400">
+              Enter an opponent's 6-character room code.
             </p>
           </div>
 

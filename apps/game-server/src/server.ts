@@ -72,8 +72,10 @@ export function buildGameServer() {
                   rated: true,
                 });
               } else if (
-                room.white.id !== authenticatedUserId &&
-                (!room.black.id || room.black.id === 'opponent_placeholder' || room.black.id === '')
+                !room.black.id ||
+                room.black.id === 'Waiting...' ||
+                room.black.id === '' ||
+                room.black.id === 'opponent_placeholder'
               ) {
                 room.setBlackPlayer({
                   id: authenticatedUserId,

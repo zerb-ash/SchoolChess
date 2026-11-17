@@ -30,8 +30,8 @@ export default function HomePage() {
             Play Chess with <span className="text-brass-300 italic font-serif">Confidence</span>
           </h1>
 
-          <p className="text-parchment-300 text-sm sm:text-base leading-relaxed">
-            Real-time multiplayer chess with instant pairings, custom invitations, and concurrent ratings across FIDE, Chess.com, and Lichess.
+          <p className="text-parchment-300 text-sm leading-relaxed">
+            Multiplayer chess with rapid pairings, bot training, and multi-system ratings.
           </p>
 
           <div className="flex items-center gap-3.5 pt-2">
@@ -74,21 +74,21 @@ export default function HomePage() {
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
               <span className="text-xs text-parchment-200 font-medium">FIDE Elo</span>
               <span className="text-base font-bold text-parchment-100 font-mono">
-                {user?.ratings?.fide || 1600}
+                {user?.ratings?.fide || 200}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
-              <span className="text-xs text-parchment-200 font-medium">Chess.com (Glicko-1)</span>
+              <span className="text-xs text-parchment-200 font-medium">Chess.com</span>
               <span className="text-base font-bold text-brass-400 font-mono">
-                {user?.ratings?.chesscom || 1500}
+                {user?.ratings?.chesscom || 200}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
-              <span className="text-xs text-parchment-200 font-medium">Lichess (Glicko-2)</span>
+              <span className="text-xs text-parchment-200 font-medium">Lichess</span>
               <span className="text-base font-bold text-parchment-300 font-mono">
-                {user?.ratings?.lichess || 1500}
+                {user?.ratings?.lichess || 200}
               </span>
             </div>
           </div>

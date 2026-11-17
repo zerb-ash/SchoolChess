@@ -15,7 +15,7 @@ export default function LiveGamePage() {
   const gameId = (params?.id as string) || 'default-room';
 
   const { themeColors, settings } = useAppSettings();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [clientSessionId] = useState(() => {
     if (typeof window === 'undefined') return 'guest_' + Math.random().toString(36).substring(2, 8);
@@ -40,6 +40,10 @@ export default function LiveGamePage() {
   }>({});
 
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
+  const [premove, setPremove] = useState<{ from: string; to: string; promotion?: 'q' | 'r' | 'b' | 'n' } | null>(null);
+  const premoveRef = useRef<{ from: string; to: string; promotion?: 'q' | 'r' | 'b' | 'n' } | null>(null);
+  premoveRef.current = premove;
+
   const [moveNumber, setMoveNumber] = useState(0);
   const [whiteClockMs, setWhiteClockMs] = useState(300000);
   const [blackClockMs, setBlackClockMs] = useState(300000);
@@ -57,6 +61,8 @@ export default function LiveGamePage() {
   const isGameOver = !!gameOverData || chess.isGameOver();
 
   useEffect(() => {
+    if (authLoading) return;
+
     const baseWsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
     const wsUrl = `${baseWsUrl}?userId=${encodeURIComponent(effectiveUserId)}&username=${encodeURIComponent(effectiveUsername)}`;
 
@@ -77,16 +83,22 @@ export default function LiveGamePage() {
 
         setPlayers({ white: state.white, black: state.black });
 
-        // Seat assignment: pieces on bottom for whichever color the user is
-        if (state.white && state.white.id === effectiveUserId) {
+        const isWhite =
+          state.white &&
+          (state.white.id === effectiveUserId ||
+            (effectiveUsername && state.white.username.toLowerCase() === effectiveUsername.toLowerCase()));
+
+        const isBlack =
+          state.black &&
+          (state.black.id === effectiveUserId ||
+            (effectiveUsername && state.black.username.toLowerCase() === effectiveUsername.toLowerCase()));
+
+        if (isWhite) {
           setMyColor('w');
           setOrientation('white');
-        } else if (state.black && state.black.id === effectiveUserId) {
+        } else if (isBlack) {
           setMyColor('b');
-          setOrientation('black');
-        } else if (state.white && (!state.black || !state.black.id || state.black.id === 'Waiting...')) {
-          setMyColor('b');
-          setOrientation('black');
+          setOrientation(settings.autoFlipWhenBlack ? 'black' : 'white');
         }
       },
       onMoveApplied: (event) => {
@@ -103,6 +115,30 @@ export default function LiveGamePage() {
           soundSystem.playCapture();
         } else {
           soundSystem.playMove();
+        }
+
+        // Trigger queued premove if it is now this player's turn
+        const nextTurn = chess.turn();
+        const activePremove = premoveRef.current;
+        if (activePremove && myColor && myColor === nextTurn) {
+          setPremove(null);
+          try {
+            const isLegal = chess.moves({ square: activePremove.from as any, verbose: true }).some(
+              (m) => m.to === activePremove.to
+            );
+            if (isLegal) {
+              manager.sendMove({
+                gameId,
+                from: activePremove.from,
+                to: activePremove.to,
+                promotion: activePremove.promotion,
+                expectedMoveNumber: event.moveNumber,
+                idempotencyKey: `${gameId}_${event.moveNumber}_${activePremove.from}_${activePremove.to}_${Date.now()}`,
+              });
+            }
+          } catch {
+            // Ignore illegal premove
+          }
         }
       },
       onMoveRejected: (err) => {
@@ -122,7 +158,7 @@ export default function LiveGamePage() {
     return () => {
       manager.disconnect();
     };
-  }, [gameId, effectiveUserId, effectiveUsername, chess]);
+  }, [gameId, effectiveUserId, effectiveUsername, authLoading, chess, myColor, settings.autoFlipWhenBlack]);
 
   // Local clock countdown for the active turn
   useEffect(() => {
@@ -148,14 +184,24 @@ export default function LiveGamePage() {
 
   const getLegalMovesForSquare = (square: string): string[] => {
     if (isGameOver) return [];
-    if (myColor && myColor !== turn) return [];
+    if (myColor && myColor !== turn) {
+      if (settings.enablePremoves) {
+        return chess.moves({ square: square as any, verbose: true }).map((m) => m.to);
+      }
+      return [];
+    }
     const moves = chess.moves({ square: square as any, verbose: true });
     return moves.map((m) => m.to);
   };
 
   const handleMakeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
     if (isGameOver) return;
-    if (myColor && myColor !== turn) return;
+    if (myColor && myColor !== turn) {
+      if (settings.enablePremoves) {
+        setPremove({ from, to, promotion });
+      }
+      return;
+    }
 
     if (tabSocketRef.current) {
       tabSocketRef.current.sendMove({
@@ -201,7 +247,7 @@ export default function LiveGamePage() {
   const topClockMs = orientation === 'white' ? blackClockMs : whiteClockMs;
   const bottomClockMs = orientation === 'white' ? whiteClockMs : blackClockMs;
 
-  const isMyTurn = myColor ? myColor === turn : true;
+  const isMyTurn = myColor !== null && myColor === turn;
 
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 py-6 px-4">
@@ -237,12 +283,13 @@ export default function LiveGamePage() {
           highlightLastMove={settings.highlightLastMove}
           highlightLegalMoves={settings.highlightLegalMoves}
           lastMove={lastMove}
+          premove={premove}
           isCheck={isCheck}
           turn={turn}
           autoQueen={settings.autoQueenPromotion}
           onMakeMove={handleMakeMove}
           getLegalMovesForSquare={getLegalMovesForSquare}
-          disabled={isGameOver || !isMyTurn}
+          disabled={isGameOver || (!isMyTurn && !settings.enablePremoves)}
         />
 
         {/* Bottom Player (You) */}

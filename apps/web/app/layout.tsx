@@ -3,8 +3,8 @@ import './globals.css';
 import { Navbar } from '../components/layout/Navbar';
 
 export const metadata: Metadata = {
-  title: 'SchoolChess | Full-Scale Server-Authoritative Chess Platform',
-  description: 'High-performance chess platform with multi-system ratings (FIDE, Chess.com, Lichess), instant matchmaking, and server-authoritative integrity.',
+  title: 'XChess | Classical Chess Platform',
+  description: 'Pure, authentic online chess platform with multi-system ratings and fair-play integrity.',
 };
 
 export default function RootLayout({

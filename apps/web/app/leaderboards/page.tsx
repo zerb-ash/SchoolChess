@@ -141,16 +141,26 @@ export default function LeaderboardsPage() {
                   <tr key={row.userId} className="hover:bg-wood-850/50 transition-colors">
                     <td className="py-3 px-4 text-center font-bold">
                       {rank === 1 ? (
-                        <Crown className="w-4 h-4 text-brass-400 mx-auto" />
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-amber-300 to-amber-500 text-wood-950 font-black text-xs flex items-center justify-center shadow-md shadow-amber-500/20 mx-auto border border-amber-200">
+                          1
+                        </div>
                       ) : rank === 2 ? (
-                        <Medal className="w-4 h-4 text-parchment-300 mx-auto" />
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-slate-200 to-slate-400 text-slate-950 font-black text-xs flex items-center justify-center shadow-md mx-auto border border-slate-100">
+                          2
+                        </div>
                       ) : rank === 3 ? (
-                        <Medal className="w-4 h-4 text-amber-600 mx-auto" />
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-b from-amber-600 to-amber-800 text-amber-100 font-black text-xs flex items-center justify-center shadow-md mx-auto border border-amber-500">
+                          3
+                        </div>
                       ) : (
-                        <span className="text-parchment-500 font-mono">#{rank}</span>
+                        <span className="text-parchment-500 font-mono text-xs">#{rank}</span>
                       )}
                     </td>
-                    <td className="py-3 px-4 font-bold text-parchment-100">{row.username}</td>
+                    <td className="py-3 px-4 font-bold text-parchment-100">
+                      <a href={`/profile/@${row.username}`} className="hover:text-brass-400 transition-colors">
+                        {row.username}
+                      </a>
+                    </td>
                     <td className="py-3 px-4 font-mono font-bold text-brass-400 text-sm">
                       {row.rating}
                       {row.provisional && <span className="text-[10px] text-parchment-500 font-normal ml-1">?</span>}

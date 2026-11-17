@@ -60,3 +60,4 @@ test('FairPlay - analyzes game moves and produces move breakdown', () => {
   assert.strictEqual(finalMove.turn, 'w');
   assert.strictEqual(finalMove.classification, 'best');
 });
+

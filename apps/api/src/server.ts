@@ -63,6 +63,76 @@ export function buildServer(userRepo?: IUserRepository) {
     return { entries };
   });
 
+  app.get('/api/v1/users/:username', async (req, reply) => {
+    let { username } = req.params as { username: string };
+    if (username.startsWith('@')) username = username.substring(1);
+
+    const user = await repo.findByUsername(username);
+    if (!user) {
+      return reply.code(404).send({ message: 'User not found' });
+    }
+
+    const ratingsList = await repo.getUserRatings(user.id);
+    const ratingsMap: Record<string, number> = {
+      rapid: 200,
+      blitz: 200,
+      bullet: 200,
+    };
+
+    for (const r of ratingsList) {
+      if (r.category in ratingsMap) {
+        ratingsMap[r.category] = r.rating;
+      }
+    }
+
+    const games = repo.getUserGames ? await repo.getUserGames(user.id) : [];
+
+    return reply.send({
+      user: {
+        id: user.id,
+        username: user.username,
+        bio: user.bio || '',
+        avatarUrl: user.avatarUrl || '',
+        views: user.views || 0,
+        createdAt: user.createdAt,
+        lastSeenAt: user.lastSeenAt || user.createdAt,
+      },
+      ratings: ratingsMap,
+      games,
+    });
+  });
+
+  app.put('/api/v1/users/:username', async (req, reply) => {
+    let { username } = req.params as { username: string };
+    if (username.startsWith('@')) username = username.substring(1);
+
+    const user = await repo.findByUsername(username);
+    if (!user) {
+      return reply.code(404).send({ message: 'User not found' });
+    }
+
+    const body = req.body as { bio?: string; avatarUrl?: string };
+    if (repo.updateProfile) {
+      const updated = await repo.updateProfile(user.id, body);
+      return reply.send({ user: updated });
+    }
+
+    return reply.send({ user });
+  });
+
+  app.post('/api/v1/users/:username/view', async (req, reply) => {
+    let { username } = req.params as { username: string };
+    if (username.startsWith('@')) username = username.substring(1);
+
+    const user = await repo.findByUsername(username);
+    if (!user) {
+      return reply.code(404).send({ message: 'User not found' });
+    }
+
+    const views = repo.incrementViews ? await repo.incrementViews(user.id) : (user.views || 0) + 1;
+    return reply.send({ views });
+  });
+
   app.register(
     async (authScope) => {
       registerAuthRoutes(authScope, repo);

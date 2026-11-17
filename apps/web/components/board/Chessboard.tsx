@@ -13,6 +13,7 @@ export interface ChessboardProps {
   highlightLastMove?: boolean;
   highlightLegalMoves?: boolean;
   lastMove?: { from: string; to: string } | null;
+  premove?: { from: string; to: string } | null;
   isCheck?: boolean;
   turn?: 'w' | 'b';
   autoQueen?: boolean;
@@ -51,6 +52,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   highlightLastMove = true,
   highlightLegalMoves = true,
   lastMove = null,
+  premove = null,
   isCheck = false,
   turn = 'w',
   autoQueen = false,
@@ -60,6 +62,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
 }) => {
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: string; to: string } | null>(null);
+  const [redSquares, setRedSquares] = useState<Set<string>>(new Set());
 
   const [dragState, setDragState] = useState<{
     piece: PieceSymbol;
@@ -77,6 +80,23 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     square: string;
     piece: PieceSymbol | null;
   } | null>(null);
+
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const wasLongPressRef = useRef(false);
+  const lastTapRef = useRef<{ square: string; time: number } | null>(null);
+
+  const toggleRedSquare = (square: string) => {
+    setRedSquares((prev) => {
+      const next = new Set(prev);
+      if (next.has(square)) next.delete(square);
+      else next.add(square);
+      return next;
+    });
+  };
+
+  const clearRedSquares = () => {
+    if (redSquares.size > 0) setRedSquares(new Set());
+  };
 
   const boardMatrix = useMemo(() => parseFenBoard(fen), [fen]);
 
@@ -120,6 +140,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     if (onMakeMove) {
       onMakeMove(from, to, promotion);
       soundSystem.playMove();
+      clearRedSquares();
     }
   };
 
@@ -187,24 +208,28 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   const handlePointerDown = (e: React.PointerEvent, square: string, piece: PieceSymbol | null) => {
     if (disabled || pendingPromotion) return;
 
+    if (e.button === 2) {
+      toggleRedSquare(square);
+      return;
+    }
+
+    wasLongPressRef.current = false;
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
+    // Long press detection for mobile/touch users (400ms hold)
+    longPressTimerRef.current = setTimeout(() => {
+      wasLongPressRef.current = true;
+      toggleRedSquare(square);
+    }, 400);
+
     pointerDownRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       square,
       piece,
     };
-
-    if (piece && piece.startsWith(turn)) {
-      setDragState({
-        piece,
-        fromSquare: square,
-        currX: e.clientX,
-        currY: e.clientY,
-        hasMoved: false,
-      });
-      setSelectedSquare(square);
-      setHoveredSquare(square);
-    }
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -214,27 +239,48 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     const dist = Math.hypot(e.clientX - down.startX, e.clientY - down.startY);
     const hasMoved = dist > 6;
 
-    if (hasMoved && down.piece && down.piece.startsWith(turn)) {
-      setDragState({
-        piece: down.piece,
-        fromSquare: down.square,
-        currX: e.clientX,
-        currY: e.clientY,
-        hasMoved: true,
-      });
+    if (hasMoved) {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current);
+      }
 
-      const hovered = getSquareFromCoords(e.clientX, e.clientY);
-      setHoveredSquare(hovered);
+      if (down.piece && down.piece.startsWith(turn)) {
+        setDragState({
+          piece: down.piece,
+          fromSquare: down.square,
+          currX: e.clientX,
+          currY: e.clientY,
+          hasMoved: true,
+        });
+
+        const hovered = getSquareFromCoords(e.clientX, e.clientY);
+        setHoveredSquare(hovered);
+      }
     }
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
+
     const down = pointerDownRef.current;
     pointerDownRef.current = null;
 
-    if (!down) return;
+    if (!down || wasLongPressRef.current) {
+      return;
+    }
 
     const targetSquare = getSquareFromCoords(e.clientX, e.clientY) || down.square;
+
+    // Check fast double tap / click for trackpad users without right-click
+    const now = Date.now();
+    if (lastTapRef.current && lastTapRef.current.square === targetSquare && now - lastTapRef.current.time < 300) {
+      lastTapRef.current = null;
+      toggleRedSquare(targetSquare);
+      return;
+    }
+    lastTapRef.current = { square: targetSquare, time: now };
 
     if (dragState && dragState.hasMoved) {
       setDragState(null);
@@ -255,6 +301,9 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   };
 
   const handlePointerCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+    }
     pointerDownRef.current = null;
     setDragState(null);
     setHoveredSquare(null);
@@ -287,13 +336,30 @@ export const Chessboard: React.FC<ChessboardProps> = ({
             const isBeingDragged = dragState?.fromSquare === square && dragState.hasMoved;
             const isHoveredDestination = isDestination && hoveredSquare === square;
 
+            const isRedHighlighted = redSquares.has(square);
+            const isPremoveSquare = premove && (premove.from === square || premove.to === square);
+
             return (
               <div
                 key={square}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  toggleRedSquare(square);
+                }}
                 onPointerDown={(e) => handlePointerDown(e, square, piece)}
                 style={{ backgroundColor: bg }}
                 className="chess-square group relative transition-colors duration-75 select-none"
               >
+                {/* Premove queued indicator */}
+                {isPremoveSquare && (
+                  <div className="absolute inset-0 bg-blue-500/30 border-2 border-blue-400 border-dashed pointer-events-none z-10 animate-pulse" />
+                )}
+
+                {/* User manual red square highlight (Right click / 2 fast clicks / long press) */}
+                {isRedHighlighted && (
+                  <div className="absolute inset-0 bg-red-600/40 border-2 border-red-500/80 pointer-events-none z-10 animate-fadeIn" />
+                )}
+
                 {/* Last move highlight */}
                 {isLastMoveSquare && (
                   <div className="absolute inset-0 bg-yellow-400/35 pointer-events-none" />
