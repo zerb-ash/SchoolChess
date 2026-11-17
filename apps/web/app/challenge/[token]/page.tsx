@@ -131,7 +131,7 @@ export default function ChallengePage() {
             <Swords className="w-7 h-7 text-brass-400" />
           </div>
           <h1 className="text-2xl font-serif tracking-wide text-parchment-100">
-            {isCreator ? 'Private Salon Invitation' : 'Chess Challenge Received'}
+            {isCreator ? 'Private Game Invitation' : 'Chess Challenge Received'}
           </h1>
           <p className="text-xs text-parchment-400 mt-1">
             Issued by <span className="font-semibold text-brass-300">{challenge.creatorUsername}</span>
@@ -166,7 +166,7 @@ export default function ChallengePage() {
                 {challenge.shortCode}
               </div>
               <span className="text-[10px] text-parchment-500">
-                Opponents can enter this 6-character code in the Salon lobby
+                Opponents can enter this 6-character code in the play lobby
               </span>
             </div>
 

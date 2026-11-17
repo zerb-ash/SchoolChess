@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Crown, Play, Swords, ShieldCheck, Zap, Flame, Clock, Trophy, ArrowRight, UserPlus } from 'lucide-react';
+import { Play, Swords, Zap, Flame, Clock, ArrowRight, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/useAuth';
 import { AuthModal } from '../components/auth/AuthModal';
 
@@ -11,10 +11,10 @@ export default function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const timeControls = [
-    { title: '1 min', sub: 'Lightning Salon', speed: '1+0', icon: Zap, pool: 'Bullet' },
-    { title: '3 min', sub: 'Rapid Exchange', speed: '3+0', icon: Flame, pool: 'Blitz' },
-    { title: '5 min', sub: 'Master Blitz', speed: '5+0', icon: Flame, pool: 'Blitz' },
-    { title: '10 min', sub: 'Classical Rapid', speed: '10+0', icon: Clock, pool: 'Rapid' },
+    { title: '1 min', sub: 'Bullet', speed: '1+0', icon: Zap },
+    { title: '3 min', sub: 'Blitz', speed: '3+0', icon: Flame },
+    { title: '5 min', sub: 'Blitz', speed: '5+0', icon: Flame },
+    { title: '10 min', sub: 'Rapid', speed: '10+0', icon: Clock },
   ];
 
   return (
@@ -22,21 +22,16 @@ export default function HomePage() {
       <div
         className="relative rounded-3xl p-8 sm:p-12 overflow-hidden bg-wood-900 border border-brass-500/30 shadow-2xl shadow-black/80 flex flex-col md:flex-row items-center justify-between gap-8"
         style={{
-          backgroundImage: 'radial-gradient(circle at 20% 0%, rgba(197, 168, 88, 0.12) 0%, transparent 60%), radial-gradient(circle at 80% 100%, rgba(139, 38, 30, 0.08) 0%, transparent 50%)',
+          backgroundImage: 'radial-gradient(circle at 20% 0%, rgba(197, 168, 88, 0.10) 0%, transparent 60%)',
         }}
       >
         <div className="flex flex-col gap-5 max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-wood-950/80 border border-brass-500/30 text-brass-400 text-xs tracking-wider uppercase font-mono w-fit">
-            <ShieldCheck className="w-3.5 h-3.5 text-brass-400" />
-            <span>Server-Authoritative • Tri-Rating Engine</span>
-          </div>
-
           <h1 className="text-3xl sm:text-5xl font-serif tracking-normal text-parchment-100 leading-tight">
-            The Classical <span className="text-brass-300 italic font-serif">Chess Salon</span>
+            Play Chess with <span className="text-brass-300 italic font-serif">Confidence</span>
           </h1>
 
           <p className="text-parchment-300 text-sm sm:text-base leading-relaxed">
-            Experience sub-50ms real-time chess with complete server authority. Every match simultaneously updates your FIDE Elo, Chess.com Glicko-1, and Lichess Glicko-2 ratings.
+            Real-time multiplayer chess with instant pairings, custom invitations, and concurrent ratings across FIDE, Chess.com, and Lichess.
           </p>
 
           <div className="flex items-center gap-3.5 pt-2">
@@ -45,7 +40,7 @@ export default function HomePage() {
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-wood-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-brass-700/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
             >
               <Play className="w-4 h-4 fill-current" />
-              <span>Enter Salon</span>
+              <span>Play Online</span>
             </Link>
 
             <Link
@@ -59,10 +54,10 @@ export default function HomePage() {
             {!user && (
               <button
                 onClick={() => setAuthModalOpen(true)}
-                className="hidden sm:inline-flex px-4 py-3 text-xs font-semibold uppercase tracking-wider text-brass-400 hover:text-brass-300 transition-colors items-center gap-1.5"
+                className="hidden sm:inline-flex px-4 py-3 text-xs font-semibold uppercase tracking-wider text-brass-400 hover:text-brass-300 transition-colors items-center gap-1.5 cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
-                <span>Join Club</span>
+                <span>Create Account</span>
               </button>
             )}
           </div>
@@ -70,43 +65,28 @@ export default function HomePage() {
 
         <div className="w-full md:w-84 bg-wood-950/90 border border-brass-500/30 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-wood-800 pb-3">
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4 text-brass-400" />
-              <span className="text-xs font-serif font-bold tracking-wider text-parchment-200 uppercase">
-                Rating Ledger
-              </span>
-            </div>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-brass-500/10 border border-brass-500/20 text-brass-300 font-mono">
-              3 ACTIVE POOLS
+            <span className="text-xs font-serif font-bold tracking-wider text-parchment-200 uppercase">
+              Your Ratings
             </span>
           </div>
 
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
-              <div className="flex flex-col">
-                <span className="text-xs text-parchment-200 font-medium">FIDE Standard</span>
-                <span className="text-[10px] text-parchment-500 font-mono">Elo System (K=40/20/10)</span>
-              </div>
+              <span className="text-xs text-parchment-200 font-medium">FIDE Elo</span>
               <span className="text-base font-bold text-parchment-100 font-mono">
                 {user?.ratings?.fide || 1600}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
-              <div className="flex flex-col">
-                <span className="text-xs text-parchment-200 font-medium">Chess.com Standard</span>
-                <span className="text-[10px] text-parchment-500 font-mono">Glicko-1 (RD Decay)</span>
-              </div>
+              <span className="text-xs text-parchment-200 font-medium">Chess.com (Glicko-1)</span>
               <span className="text-base font-bold text-brass-400 font-mono">
                 {user?.ratings?.chesscom || 1500}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
-              <div className="flex flex-col">
-                <span className="text-xs text-parchment-200 font-medium">Lichess Standard</span>
-                <span className="text-[10px] text-parchment-500 font-mono">Glicko-2 (Illinois Root)</span>
-              </div>
+              <span className="text-xs text-parchment-200 font-medium">Lichess (Glicko-2)</span>
               <span className="text-base font-bold text-parchment-300 font-mono">
                 {user?.ratings?.lichess || 1500}
               </span>
@@ -118,13 +98,13 @@ export default function HomePage() {
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-serif text-parchment-100 flex items-center gap-2">
-            <span>Tournament Tables</span>
+            <span>Quick Pairings</span>
           </h2>
           <Link
             href="/play"
             className="text-xs text-brass-400 hover:text-brass-300 flex items-center gap-1 uppercase tracking-wider font-semibold"
           >
-            <span>All Queues</span>
+            <span>All Modes</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -149,29 +129,6 @@ export default function HomePage() {
               </Link>
             );
           })}
-        </div>
-      </div>
-
-      <div className="p-8 rounded-2xl bg-wood-900/60 border border-wood-800 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="flex flex-col gap-2">
-          <h3 className="font-serif text-base text-parchment-100">Server Authority</h3>
-          <p className="text-xs text-parchment-400 leading-relaxed">
-            Move legality, FEN positions, monotonic clocks, and draw claims are computed strictly on the backend to prevent tampering and desyncs.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="font-serif text-base text-parchment-100">Cross-Tab Synchronization</h3>
-          <p className="text-xs text-parchment-400 leading-relaxed">
-            A single persistent WebSocket connection per browser session with Web Locks leader election and BroadcastChannel IPC.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <h3 className="font-serif text-base text-parchment-100">Classroom Ready</h3>
-          <p className="text-xs text-parchment-400 leading-relaxed">
-            Instant 6-character room codes permit effortless verbal sharing on local networks or in chess clubs without account friction.
-          </p>
         </div>
       </div>
 

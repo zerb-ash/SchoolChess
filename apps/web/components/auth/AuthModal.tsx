@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, ShieldCheck, Crown, ArrowRight, AlertCircle, Lock, User } from 'lucide-react';
+import { X, Crown, ArrowRight, AlertCircle, Lock, User } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
 
 interface AuthModalProps {
@@ -84,12 +84,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <Crown className="w-6 h-6 text-brass-400" />
           </div>
           <h2 className="text-2xl font-serif tracking-wide text-parchment-100">
-            {mode === 'register' ? 'Join the Salon' : 'Welcome Back'}
+            {mode === 'register' ? 'Create Account' : 'Sign In'}
           </h2>
           <p className="text-xs text-parchment-400 mt-1 max-w-xs">
             {mode === 'register'
-              ? 'Create your credentials to track FIDE, Chess.com, and Lichess ratings concurrently.'
-              : 'Enter your credentials to resume your authoritative rated games.'}
+              ? 'Choose a username and password to start playing rated games.'
+              : 'Enter your credentials to continue your games.'}
           </p>
         </div>
 
@@ -144,8 +144,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. Capablanca"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-wood-950 border border-wood-700 focus:border-brass-400 focus:outline-none text-sm text-parchment-100 placeholder:text-parchment-500 transition-colors"
+                placeholder="Username"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg custom-input text-sm text-parchment-100 placeholder:text-parchment-500 transition-colors"
               />
             </div>
           </div>
@@ -163,7 +163,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="8 - 72 characters"
-                className="w-full pl-9 pr-3 py-2.5 rounded-lg bg-wood-950 border border-wood-700 focus:border-brass-400 focus:outline-none text-sm text-parchment-100 placeholder:text-parchment-500 transition-colors"
+                className="w-full pl-9 pr-3 py-2.5 rounded-lg custom-input text-sm text-parchment-100 placeholder:text-parchment-500 transition-colors"
               />
             </div>
           </div>
@@ -172,20 +172,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-wood-950 font-bold text-sm tracking-wide shadow-lg shadow-brass-700/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-wood-950 font-bold text-sm tracking-wide shadow-lg shadow-brass-700/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>{submitting ? 'Authenticating...' : mode === 'register' ? 'Establish Account' : 'Sign In'}</span>
+              <span>{submitting ? 'Please wait...' : mode === 'register' ? 'Create Account' : 'Sign In'}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </form>
-
-        <div className="mt-6 pt-4 border-t border-wood-800 flex items-center justify-center gap-2 text-[11px] text-parchment-500">
-          <ShieldCheck className="w-3.5 h-3.5 text-brass-500" />
-          <span>Pure username & password • Argon2id hardened encryption</span>
-        </div>
       </div>
     </div>
   );
 };
-

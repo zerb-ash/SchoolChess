@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Crown, Zap, Flame, Clock, Swords, Plus, KeyRound, AlertCircle, ArrowRight, X } from 'lucide-react';
+import { Zap, Flame, Clock, Swords, Plus, KeyRound, AlertCircle, ArrowRight, X } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -30,10 +30,10 @@ export default function PlayPage() {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const timeControls = [
-    { title: '1 min', sub: 'Lightning Salon', speed: '1+0', icon: Zap, label: 'Bullet' },
-    { title: '3 min', sub: 'Rapid Exchange', speed: '3+0', icon: Flame, label: 'Blitz' },
-    { title: '5 min', sub: 'Master Blitz', speed: '5+0', icon: Flame, label: 'Blitz' },
-    { title: '10 min', sub: 'Classical Rapid', speed: '10+0', icon: Clock, label: 'Rapid' },
+    { title: '1 min', sub: 'Bullet', speed: '1+0', icon: Zap },
+    { title: '3 min', sub: 'Blitz', speed: '3+0', icon: Flame },
+    { title: '5 min', sub: 'Blitz', speed: '5+0', icon: Flame },
+    { title: '10 min', sub: 'Rapid', speed: '10+0', icon: Clock },
   ];
 
   const handleJoinQueue = async (speed: string) => {
@@ -87,7 +87,6 @@ export default function PlayPage() {
         }
       }, 1500);
     } catch {
-      // Offline fallback: launch sandbox / local game room
       const localGameId = 'game_' + Math.random().toString(36).substring(2, 10);
       router.push(`/game/${localGameId}`);
     }
@@ -172,31 +171,27 @@ export default function PlayPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col gap-10">
       <div className="flex flex-col gap-2 border-b border-wood-800 pb-6">
-        <div className="flex items-center gap-2 text-brass-400 text-xs uppercase tracking-widest font-mono">
-          <Crown className="w-4 h-4" />
-          <span>Authoritative Matchmaking</span>
-        </div>
-        <h1 className="text-3xl font-serif text-parchment-100">Grandmaster Salon</h1>
+        <h1 className="text-3xl font-serif text-parchment-100">Play Online</h1>
         <p className="text-xs text-parchment-400 max-w-xl leading-relaxed">
-          Select a time control for instant pairing against peer opponents, or create an invitation-only room for friends or classmates.
+          Select a time control for quick pairing or create a private match with a shareable code.
         </p>
       </div>
 
       {activeQueue ? (
         <div className="p-8 rounded-2xl bg-wood-900 border border-brass-500/40 shadow-2xl flex flex-col items-center justify-center text-center gap-4 animate-fadeIn">
           <div className="w-14 h-14 rounded-full border-4 border-brass-500 border-t-transparent animate-spin mb-2" />
-          <h2 className="text-xl font-serif text-parchment-100">Searching for Opponent</h2>
+          <h2 className="text-xl font-serif text-parchment-100">Finding Opponent</h2>
           <p className="text-xs text-parchment-400">
-            Pool: <span className="font-mono font-bold text-brass-300">{activeQueue.timeControl}</span> • Time elapsed: <span className="font-mono text-parchment-200">{activeQueue.waitSeconds}s</span>
+            {activeQueue.timeControl} • Waiting: <span className="font-mono text-parchment-200">{activeQueue.waitSeconds}s</span>
           </p>
           <div className="text-[11px] px-3 py-1 rounded-full bg-wood-950 border border-wood-800 text-parchment-400 font-mono">
-            Rating Window: ±{activeQueue.ratingRange} points
+            Rating Tolerance: ±{activeQueue.ratingRange}
           </div>
           <button
             onClick={handleCancelQueue}
-            className="mt-4 px-6 py-2.5 rounded-lg bg-wood-950 hover:bg-wood-800 border border-wood-700 text-parchment-300 text-xs font-semibold transition-colors"
+            className="mt-4 px-6 py-2.5 rounded-lg bg-wood-950 hover:bg-wood-800 border border-wood-700 text-parchment-300 text-xs font-semibold transition-colors cursor-pointer"
           >
-            Cancel Matchmaking
+            Cancel
           </button>
         </div>
       ) : (
@@ -209,7 +204,7 @@ export default function PlayPage() {
                 <button
                   key={tc.speed}
                   onClick={() => handleJoinQueue(tc.speed)}
-                  className="p-5 rounded-2xl bg-wood-900 border border-wood-800 hover:border-brass-500/50 hover:bg-wood-850 flex flex-col gap-2 transition-all hover:-translate-y-0.5 shadow-lg group text-left"
+                  className="p-5 rounded-2xl bg-wood-900 border border-wood-800 hover:border-brass-500/50 hover:bg-wood-850 flex flex-col gap-2 transition-all hover:-translate-y-0.5 shadow-lg group text-left cursor-pointer"
                 >
                   <div className="flex items-center justify-between">
                     <Icon className="w-5 h-5 text-brass-400 group-hover:scale-110 transition-transform" />
@@ -231,18 +226,18 @@ export default function PlayPage() {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-brass-400">
               <Swords className="w-5 h-5" />
-              <h3 className="font-serif text-lg text-parchment-100">Private Challenge</h3>
+              <h3 className="font-serif text-lg text-parchment-100">Private Match</h3>
             </div>
             <p className="text-xs text-parchment-400 leading-relaxed">
-              Create a custom match with shareable link and a 6-digit room code for direct play.
+              Create a custom game with a shareable link or a 6-digit room code.
             </p>
           </div>
           <button
             onClick={() => setChallengeModalOpen(true)}
-            className="w-full py-3 rounded-xl bg-brass-600 hover:bg-brass-500 text-wood-950 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md"
+            className="w-full py-3 rounded-xl bg-brass-600 hover:bg-brass-500 text-wood-950 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Create Invitation</span>
+            <span>Create Private Match</span>
           </button>
         </div>
 
@@ -253,7 +248,7 @@ export default function PlayPage() {
               <h3 className="font-serif text-lg text-parchment-100">Join by Room Code</h3>
             </div>
             <p className="text-xs text-parchment-400 leading-relaxed">
-              Have a 6-character room code from a classmate or instructor? Enter it below.
+              Enter a 6-character room code from an opponent or classroom teacher.
             </p>
           </div>
 
@@ -271,12 +266,12 @@ export default function PlayPage() {
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
                 placeholder="e.g. K9W42B"
-                className="flex-1 px-3 py-2.5 rounded-lg bg-wood-950 border border-wood-700 focus:border-brass-400 focus:outline-none text-sm font-mono tracking-widest text-parchment-100 uppercase"
+                className="flex-1 px-3 py-2.5 rounded-lg custom-input text-sm font-mono tracking-widest text-parchment-100 uppercase"
               />
               <button
                 type="submit"
                 disabled={joiningCode || !joinCode.trim()}
-                className="px-5 py-2.5 rounded-lg bg-wood-850 hover:bg-wood-800 text-parchment-200 border border-wood-700 text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5 transition-colors"
+                className="px-5 py-2.5 rounded-lg bg-wood-850 hover:bg-wood-800 text-parchment-200 border border-wood-700 text-xs font-semibold disabled:opacity-50 flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <span>Join</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -290,10 +285,10 @@ export default function PlayPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-wood-900 border border-brass-500/30 p-6 shadow-2xl text-parchment-100">
             <div className="flex items-center justify-between pb-4 border-b border-wood-800 mb-4">
-              <h3 className="font-serif text-lg text-parchment-100">Configure Challenge</h3>
+              <h3 className="font-serif text-lg text-parchment-100">Custom Match</h3>
               <button
                 onClick={() => setChallengeModalOpen(false)}
-                className="p-1 text-parchment-400 hover:text-parchment-100"
+                className="p-1 text-parchment-400 hover:text-parchment-100 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -310,7 +305,7 @@ export default function PlayPage() {
                       key={tc}
                       type="button"
                       onClick={() => setChallengeTimeControl(tc)}
-                      className={`py-2 text-xs font-mono font-semibold rounded-lg border transition-all ${
+                      className={`py-2 text-xs font-mono font-semibold rounded-lg border transition-all cursor-pointer ${
                         challengeTimeControl === tc
                           ? 'bg-brass-600 text-wood-950 border-brass-500'
                           : 'bg-wood-950 text-parchment-300 border-wood-800 hover:border-wood-700'
@@ -332,7 +327,7 @@ export default function PlayPage() {
                       key={side}
                       type="button"
                       onClick={() => setChallengeSide(side)}
-                      className={`py-2 text-xs font-semibold capitalize rounded-lg border transition-all ${
+                      className={`py-2 text-xs font-semibold capitalize rounded-lg border transition-all cursor-pointer ${
                         challengeSide === side
                           ? 'bg-brass-600 text-wood-950 border-brass-500'
                           : 'bg-wood-950 text-parchment-300 border-wood-800 hover:border-wood-700'
@@ -345,13 +340,20 @@ export default function PlayPage() {
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-xl bg-wood-950 border border-wood-800">
-                <span className="text-xs text-parchment-300">Rated Game (Multi-System)</span>
-                <input
-                  type="checkbox"
-                  checked={challengeRated}
-                  onChange={(e) => setChallengeRated(e.target.checked)}
-                  className="w-4 h-4 accent-brass-500 rounded"
-                />
+                <span className="text-xs text-parchment-300">Rated Match</span>
+                <button
+                  type="button"
+                  onClick={() => setChallengeRated(!challengeRated)}
+                  className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                    challengeRated ? 'bg-brass-600' : 'bg-wood-800'
+                  }`}
+                >
+                  <div
+                    className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
+                      challengeRated ? 'left-6' : 'left-1'
+                    }`}
+                  />
+                </button>
               </div>
 
               <div className="pt-2">
@@ -359,9 +361,9 @@ export default function PlayPage() {
                   type="button"
                   onClick={handleCreateChallenge}
                   disabled={creatingChallenge}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 text-wood-950 font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.01] shadow-lg shadow-brass-700/20"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 text-wood-950 font-bold text-xs uppercase tracking-wider transition-all hover:scale-[1.01] shadow-lg shadow-brass-700/20 cursor-pointer"
                 >
-                  {creatingChallenge ? 'Generating Room...' : 'Create Room & Get Link'}
+                  {creatingChallenge ? 'Generating Room...' : 'Create Match & Get Code'}
                 </button>
               </div>
             </div>
