@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Zap, Flame, Clock, Swords, Plus, KeyRound, AlertCircle, ArrowRight, X } from 'lucide-react';
+import { Zap, Flame, Clock, Swords, Plus, KeyRound, AlertCircle, ArrowRight, X, Lock, Bot } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
+import { AuthModal } from '../../components/auth/AuthModal';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 export default function PlayPage() {
   const router = useRouter();
   const { user } = useAuth();
+  const [authRequiredModalOpen, setAuthRequiredModalOpen] = useState(false);
 
   const [activeQueue, setActiveQueue] = useState<{
     timeControl: string;
@@ -37,8 +40,13 @@ export default function PlayPage() {
   ];
 
   const handleJoinQueue = async (speed: string) => {
-    const userId = user?.id || 'guest_' + Math.random().toString(36).substring(2, 9);
-    const username = user?.username || 'Guest';
+    if (!user) {
+      setAuthRequiredModalOpen(true);
+      return;
+    }
+
+    const userId = user.id;
+    const username = user.username;
 
     try {
       const res = await fetch(`${API_BASE}/api/v1/matchmaking/join`, {
@@ -221,7 +229,26 @@ export default function PlayPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+        <div className="p-6 rounded-2xl bg-wood-900 border border-wood-800 flex flex-col justify-between gap-4">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2 text-brass-400">
+              <Bot className="w-5 h-5" />
+              <h3 className="font-serif text-lg text-parchment-100">Play Computer</h3>
+            </div>
+            <p className="text-xs text-parchment-400 leading-relaxed">
+              Challenge bots across 5 difficulty levels from Beginner (200 Elo) to Master (2000 Elo) with live evaluation.
+            </p>
+          </div>
+          <Link
+            href="/play/computer"
+            className="w-full py-3 rounded-xl bg-wood-850 hover:bg-wood-800 text-parchment-100 border border-wood-700 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-brass-400" />
+            <span>Practice vs Bot</span>
+          </Link>
+        </div>
+
         <div className="p-6 rounded-2xl bg-wood-900 border border-wood-800 flex flex-col justify-between gap-4">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 text-brass-400">
@@ -237,7 +264,7 @@ export default function PlayPage() {
             className="w-full py-3 rounded-xl bg-brass-600 hover:bg-brass-500 text-wood-950 font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            <span>Create Private Match</span>
+            <span>Create Match</span>
           </button>
         </div>
 
@@ -370,6 +397,12 @@ export default function PlayPage() {
           </div>
         </div>
       )}
+
+      <AuthModal
+        isOpen={authRequiredModalOpen}
+        onClose={() => setAuthRequiredModalOpen(false)}
+        defaultMode="register"
+      />
     </div>
   );
 }

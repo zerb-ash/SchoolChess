@@ -25,7 +25,15 @@ export function buildGameServer() {
   app.register(async (wsScope) => {
     wsScope.get('/ws/game', { websocket: true }, (socket: WebSocket, req) => {
       let activeGameId: string | null = null;
-      let authenticatedUserId = (req.query as any)?.userId || `anon_${Math.random().toString(36).substring(2, 8)}`;
+      const parsedUrl = new URL(req.url || '', 'http://localhost');
+      const authenticatedUserId =
+        (req.query as any)?.userId ||
+        parsedUrl.searchParams.get('userId') ||
+        `guest_${Math.random().toString(36).substring(2, 8)}`;
+      const authenticatedUsername =
+        (req.query as any)?.username ||
+        parsedUrl.searchParams.get('username') ||
+        (authenticatedUserId.startsWith('guest_') ? 'Guest' : 'Player');
       let messageCountInWindow = 0;
       let windowStart = Date.now();
 
@@ -37,7 +45,6 @@ export function buildGameServer() {
         }
         messageCountInWindow += 1;
 
-        // Token bucket: Disconnect socket exceeding 20 msgs/second
         if (messageCountInWindow > 20) {
           socket.close(4429, 'RATE_LIMIT_EXCEEDED');
           return;
@@ -54,15 +61,26 @@ export function buildGameServer() {
 
               activeGameId = gameId;
 
-              // Ensure room exists (defaults for sandbox/tests or loaded from store)
-              const room = roomManager.getOrCreateRoom({
-                gameId,
-                white: { id: authenticatedUserId, username: 'Player1', rating: 1500 },
-                black: { id: 'opponent_placeholder', username: 'Player2', rating: 1500 },
-                baseTimeSeconds: 300,
-                incrementSeconds: 0,
-                rated: true,
-              });
+              let room = roomManager.getRoom(gameId);
+              if (!room) {
+                room = roomManager.getOrCreateRoom({
+                  gameId,
+                  white: { id: authenticatedUserId, username: authenticatedUsername, rating: 200 },
+                  black: { id: '', username: 'Waiting...', rating: 200 },
+                  baseTimeSeconds: 300,
+                  incrementSeconds: 0,
+                  rated: true,
+                });
+              } else if (
+                room.white.id !== authenticatedUserId &&
+                (!room.black.id || room.black.id === 'opponent_placeholder' || room.black.id === '')
+              ) {
+                room.setBlackPlayer({
+                  id: authenticatedUserId,
+                  username: authenticatedUsername,
+                  rating: 200,
+                });
+              }
 
               room.addSocket(socket, authenticatedUserId);
               break;

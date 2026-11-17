@@ -20,6 +20,21 @@ export interface ChallengeData {
 
 const activeChallenges = new Map<string, ChallengeData>();
 const shortCodeMap = new Map<string, string>();
+const challengeRateLimitMap = new Map<string, number[]>();
+
+function checkChallengeRateLimit(identifier: string, isGuest: boolean): boolean {
+  const now = Date.now();
+  const windowMs = 60_000;
+  const maxAllowed = isGuest ? 1 : 5;
+
+  const timestamps = (challengeRateLimitMap.get(identifier) || []).filter((t) => now - t < windowMs);
+  if (timestamps.length >= maxAllowed) {
+    return false;
+  }
+  timestamps.push(now);
+  challengeRateLimitMap.set(identifier, timestamps);
+  return true;
+}
 
 function generateShortCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -51,21 +66,35 @@ export async function challengesRoutes(app: FastifyInstance) {
     }
 
     const { creatorId, creatorUsername, timeControl, side, rated } = parseRes.data;
+
+    const isGuest = !creatorId || creatorId.startsWith('guest_') || creatorId.startsWith('anon_');
+    const rateLimitKey = req.ip || creatorId || 'anon';
+
+    if (!checkChallengeRateLimit(rateLimitKey, isGuest)) {
+      return reply.code(429).send({
+        message: isGuest
+          ? 'Guest challenge limit reached (1 challenge per minute). Please create an account for higher limits.'
+          : 'Challenge rate limit reached (5 challenges per minute). Please wait.',
+      });
+    }
+
     const token = crypto.randomBytes(16).toString('hex');
     let shortCode = generateShortCode();
     while (shortCodeMap.has(shortCode)) {
       shortCode = generateShortCode();
     }
 
+    const effectiveRated = isGuest ? false : rated;
+
     const challenge: ChallengeData = {
       id: crypto.randomUUID(),
       token,
       shortCode,
-      creatorId: creatorId || 'anon_' + crypto.randomBytes(4).toString('hex'),
-      creatorUsername: creatorUsername || 'Challenger',
+      creatorId: creatorId || 'guest_' + crypto.randomBytes(4).toString('hex'),
+      creatorUsername: creatorUsername || 'Guest',
       timeControl,
       side,
-      rated,
+      rated: effectiveRated,
       status: 'open',
       createdAt: Date.now(),
     };
@@ -98,7 +127,17 @@ export async function challengesRoutes(app: FastifyInstance) {
 
     const parseRes = AcceptChallengeSchema.safeParse(req.body);
     const acceptorId = parseRes.success && parseRes.data.userId ? parseRes.data.userId : 'guest_' + crypto.randomBytes(4).toString('hex');
-    const acceptorUsername = parseRes.success && parseRes.data.username ? parseRes.data.username : 'Opponent';
+    const acceptorUsername = parseRes.success && parseRes.data.username ? parseRes.data.username : 'Guest';
+
+    const isGuestMatch =
+      challenge.creatorId.startsWith('guest_') ||
+      challenge.creatorId.startsWith('anon_') ||
+      acceptorId.startsWith('guest_') ||
+      acceptorId.startsWith('anon_');
+
+    if (isGuestMatch) {
+      challenge.rated = false;
+    }
 
     const gameId = 'game_' + crypto.randomUUID();
 
@@ -147,4 +186,3 @@ export async function challengesRoutes(app: FastifyInstance) {
     return reply.send({ token, challenge });
   });
 }
-

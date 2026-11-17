@@ -129,3 +129,6 @@ export class ChessGameEngine {
   }
 }
 
+export * from './bot-engine.js';
+
+

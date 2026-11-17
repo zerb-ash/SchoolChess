@@ -22,7 +22,7 @@ export interface GameRoomOptions {
 export class GameRoom {
   public readonly gameId: string;
   public readonly white: PlayerInfo;
-  public readonly black: PlayerInfo;
+  public black: PlayerInfo;
   public readonly rated: boolean;
   private engine: ChessGameEngine;
   private clock: AuthoritativeClock;
@@ -49,6 +49,14 @@ export class GameRoom {
       (loserColor) => this.handleTimeout(loserColor)
     );
     this.clock.start();
+  }
+
+  public setBlackPlayer(player: PlayerInfo): void {
+    this.black = player;
+    this.broadcast({
+      type: 'game:state',
+      payload: this.getStatePayload(),
+    });
   }
 
   public addSocket(ws: WebSocket, userId: string): void {

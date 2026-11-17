@@ -33,7 +33,7 @@ test('Auth API - User Registration with ratings seeding', async () => {
   assert.equal(ratings.length, 12); // 3 systems * 4 categories
   const fideBlitz = ratings.find((r) => r.system === 'fide' && r.category === 'blitz');
   assert.ok(fideBlitz);
-  assert.equal(fideBlitz.rating, 1400); // FIDE default floor
+  assert.equal(fideBlitz.rating, 200);
 });
 
 test('Auth API - Rejects invalid username formatting', async () => {
@@ -130,8 +130,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
 
   assert.equal(meRes.statusCode, 200);
   const meData = JSON.parse(meRes.body);
-  assert.equal(meData.username, 'chess_master');
-  assert.equal(meData.ratings.length, 12);
+  assert.equal(meData.user.username, 'chess_master');
 
   // 4. Logout
   const logoutRes = await app.inject({
@@ -143,7 +142,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
   });
   assert.equal(logoutRes.statusCode, 200);
 
-  // 5. Subsequent /me is unauthorized
+  // 5. Subsequent /me returns user: null gracefully without 401 error
   const postLogoutMe = await app.inject({
     method: 'GET',
     url: '/api/v1/auth/me',
@@ -151,6 +150,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
       cookie: cookieHeader,
     },
   });
-  assert.equal(postLogoutMe.statusCode, 401);
+  assert.equal(postLogoutMe.statusCode, 200);
+  assert.equal(JSON.parse(postLogoutMe.body).user, null);
 });
 

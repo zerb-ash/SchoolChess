@@ -28,23 +28,20 @@ export function useAuth() {
       });
       if (res.ok) {
         const data = await res.json();
-        const fullUser: AuthUser = {
-          ...data.user,
-          ratings: data.ratings || { fide: 1600, chesscom: 1500, lichess: 1500 },
-        };
-        setUser(fullUser);
-        localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(fullUser));
-      } else {
-        const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-        if (stored) {
-          try {
-            setUser(JSON.parse(stored));
-          } catch {
-            setUser(null);
-          }
+        if (data.user) {
+          const fullUser: AuthUser = {
+            ...data.user,
+            ratings: data.user.ratings || { fide: 200, chesscom: 200, lichess: 200 },
+          };
+          setUser(fullUser);
+          localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(fullUser));
         } else {
           setUser(null);
+          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
         }
+      } else {
+        setUser(null);
+        localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
       }
     } catch {
       const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
@@ -86,13 +83,12 @@ export function useAuth() {
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Registration failed';
-      // Graceful offline fallback: allow local testing if server is unreachable
       if (message.includes('fetch') || message.includes('NetworkError') || message.includes('Failed to fetch')) {
         const mockUser: AuthUser = {
           id: 'local_' + Math.random().toString(36).substring(2, 9),
           username,
           createdAt: new Date().toISOString(),
-          ratings: { fide: 1600, chesscom: 1500, lichess: 1500 },
+          ratings: { fide: 200, chesscom: 200, lichess: 200 },
         };
         setUser(mockUser);
         localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(mockUser));
@@ -130,7 +126,7 @@ export function useAuth() {
           id: 'local_' + Math.random().toString(36).substring(2, 9),
           username,
           createdAt: new Date().toISOString(),
-          ratings: { fide: 1600, chesscom: 1500, lichess: 1500 },
+          ratings: { fide: 200, chesscom: 200, lichess: 200 },
         };
         setUser(mockUser);
         localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(mockUser));
@@ -166,4 +162,3 @@ export function useAuth() {
     refreshUser,
   };
 }
-

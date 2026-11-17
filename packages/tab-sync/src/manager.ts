@@ -321,6 +321,14 @@ export class TabSocketManager {
     }
   }
 
+  public joinGame(gameId: string): void {
+    this.subscribeGame(gameId);
+  }
+
+  public disconnect(): void {
+    this.destroy();
+  }
+
   public sendMove(submission: MoveSubmission): void {
     if (this.role === 'leader') {
       this.socketSend({ type: 'game:move', payload: submission });

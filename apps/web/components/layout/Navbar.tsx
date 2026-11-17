@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Crown, Play, Swords, Trophy, Settings, LogOut, UserPlus, LogIn, ChevronDown } from 'lucide-react';
+import { Crown, Play, Swords, Trophy, Settings, LogOut, UserPlus, LogIn, ChevronDown, Bot } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
 import { AuthModal } from '../auth/AuthModal';
 
@@ -17,6 +17,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { href: '/', label: 'Home', icon: Crown },
     { href: '/play', label: 'Play Online', icon: Play },
+    { href: '/play/computer', label: 'Computer', icon: Bot },
     { href: '/sandbox', label: 'Pass & Play', icon: Swords },
     { href: '/leaderboards', label: 'Leaderboards', icon: Trophy },
     { href: '/settings', label: 'Settings', icon: Settings },

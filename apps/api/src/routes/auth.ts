@@ -106,26 +106,31 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
   app.get('/me', async (request: FastifyRequest, reply: FastifyReply) => {
     const token = request.cookies[COOKIE_NAME];
     if (!token) {
-      return reply.status(401).send({ error: 'UNAUTHORIZED' });
+      return reply.status(200).send({ user: null });
     }
 
     const session = sessionStore.getSession(token);
     if (!session) {
-      return reply.status(401).send({ error: 'SESSION_EXPIRED' });
+      return reply.status(200).send({ user: null });
     }
 
     const user = await userRepo.findById(session.userId);
     if (!user) {
-      return reply.status(404).send({ error: 'USER_NOT_FOUND' });
+      return reply.status(200).send({ user: null });
     }
 
-    const ratings = await userRepo.getUserRatings(user.id);
+    const ratingsList = await userRepo.getUserRatings(user.id);
+    const fide = ratingsList.find((r) => r.system === 'fide')?.rating || 200;
+    const chesscom = ratingsList.find((r) => r.system === 'chess_com')?.rating || 200;
+    const lichess = ratingsList.find((r) => r.system === 'lichess')?.rating || 200;
 
     return reply.status(200).send({
-      id: user.id,
-      username: user.username,
-      createdAt: user.createdAt,
-      ratings,
+      user: {
+        id: user.id,
+        username: user.username,
+        createdAt: user.createdAt,
+        ratings: { fide, chesscom, lichess },
+      },
     });
   });
 }

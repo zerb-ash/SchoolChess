@@ -76,11 +76,11 @@ export class PostgresUserRepository implements IUserRepository {
             userId: u.id,
             system: sys,
             category: cat,
-            rating: sys === 'fide' ? 1400 : 1500,
+            rating: 200,
             ratingDeviation: sys === 'fide' ? null : 350,
             volatility: sys === 'lichess' ? 0.06 : null,
             kFactor: sys === 'fide' ? 40 : null,
-            peakRating: sys === 'fide' ? 1400 : 1500,
+            peakRating: 200,
             provisional: true,
           });
         }
@@ -149,7 +149,7 @@ export class InMemoryUserRepository implements IUserRepository {
         userRatingList.push({
           system: sys,
           category: cat,
-          rating: sys === 'fide' ? 1400 : 1500,
+          rating: 200,
           provisional: true,
         });
       }

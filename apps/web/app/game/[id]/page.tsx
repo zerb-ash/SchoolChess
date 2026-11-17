@@ -5,18 +5,40 @@ import { useParams } from 'next/navigation';
 import { Chess } from 'chess.js';
 import { Chessboard } from '../../../components/board/Chessboard';
 import { useAppSettings } from '../../../lib/useSettings';
+import { useAuth } from '../../../lib/useAuth';
 import { soundSystem } from '../../../lib/audio';
 import { TabSocketManager } from '@schoolchess/tab-sync';
-import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown } from 'lucide-react';
+import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User } from 'lucide-react';
 
 export default function LiveGamePage() {
   const params = useParams();
   const gameId = (params?.id as string) || 'default-room';
 
-  const { currentThemeColors: themeColors, settings } = useAppSettings();
+  const { themeColors, settings } = useAppSettings();
+  const { user } = useAuth();
+
+  const [clientSessionId] = useState(() => {
+    if (typeof window === 'undefined') return 'guest_' + Math.random().toString(36).substring(2, 8);
+    let id = sessionStorage.getItem('schoolchess_game_client_id');
+    if (!id) {
+      id = 'guest_' + Math.random().toString(36).substring(2, 8);
+      sessionStorage.setItem('schoolchess_game_client_id', id);
+    }
+    return id;
+  });
+
+  const effectiveUserId = user ? user.id : clientSessionId;
+  const effectiveUsername = user ? user.username : 'Guest ' + clientSessionId.substring(6, 10);
+
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(() => chess.fen());
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
+  const [myColor, setMyColor] = useState<'w' | 'b' | null>(null);
+  const [players, setPlayers] = useState<{
+    white?: { id: string; username: string };
+    black?: { id: string; username: string };
+  }>({});
+
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [moveNumber, setMoveNumber] = useState(0);
   const [whiteClockMs, setWhiteClockMs] = useState(300000);
@@ -35,7 +57,8 @@ export default function LiveGamePage() {
   const isGameOver = !!gameOverData || chess.isGameOver();
 
   useEffect(() => {
-    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
+    const baseWsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
+    const wsUrl = `${baseWsUrl}?userId=${encodeURIComponent(effectiveUserId)}&username=${encodeURIComponent(effectiveUsername)}`;
 
     const manager = new TabSocketManager({
       wsUrl,
@@ -51,6 +74,20 @@ export default function LiveGamePage() {
         setMoveNumber(state.moveNumber);
         setWhiteClockMs(state.whiteClockMs);
         setBlackClockMs(state.blackClockMs);
+
+        setPlayers({ white: state.white, black: state.black });
+
+        // Seat assignment: pieces on bottom for whichever color the user is
+        if (state.white && state.white.id === effectiveUserId) {
+          setMyColor('w');
+          setOrientation('white');
+        } else if (state.black && state.black.id === effectiveUserId) {
+          setMyColor('b');
+          setOrientation('black');
+        } else if (state.white && (!state.black || !state.black.id || state.black.id === 'Waiting...')) {
+          setMyColor('b');
+          setOrientation('black');
+        }
       },
       onMoveApplied: (event) => {
         chess.load(event.fen);
@@ -80,14 +117,14 @@ export default function LiveGamePage() {
     });
 
     tabSocketRef.current = manager;
-    manager.subscribeGame(gameId);
+    manager.joinGame(gameId);
 
     return () => {
-      manager.destroy();
+      manager.disconnect();
     };
-  }, [gameId]);
+  }, [gameId, effectiveUserId, effectiveUsername, chess]);
 
-  // Smooth local clock countdown interpolation
+  // Local clock countdown for the active turn
   useEffect(() => {
     if (isGameOver || !isConnected) return;
 
@@ -103,42 +140,40 @@ export default function LiveGamePage() {
   }, [turn, isGameOver, isConnected]);
 
   const formatClock = (ms: number): string => {
-    const totalSecs = Math.floor(ms / 1000);
-    const mins = Math.floor(totalSecs / 60);
-    const secs = totalSecs % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const getLegalMovesForSquare = (square: string): string[] => {
     if (isGameOver) return [];
-    try {
-      const moves = chess.moves({ square: square as any, verbose: true });
-      return moves.map((m) => m.to);
-    } catch {
-      return [];
-    }
+    if (myColor && myColor !== turn) return [];
+    const moves = chess.moves({ square: square as any, verbose: true });
+    return moves.map((m) => m.to);
   };
 
   const handleMakeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
-    if (isGameOver || !tabSocketRef.current) return;
+    if (isGameOver) return;
+    if (myColor && myColor !== turn) return;
 
-    tabSocketRef.current.sendMove({
-      gameId,
-      from,
-      to,
-      promotion,
-      expectedMoveNumber: moveNumberRef.current,
-      idempotencyKey: crypto.randomUUID(),
-    });
+    if (tabSocketRef.current) {
+      tabSocketRef.current.sendMove({
+        gameId,
+        from,
+        to,
+        promotion,
+        expectedMoveNumber: moveNumberRef.current,
+        idempotencyKey: `${gameId}_${moveNumberRef.current}_${from}_${to}_${Date.now()}`,
+      });
+    }
   };
 
   const handleResign = () => {
     if (!confirmResign) {
       setConfirmResign(true);
-      setTimeout(() => setConfirmResign(false), 3000);
       return;
     }
-
     if (tabSocketRef.current) {
       tabSocketRef.current.sendResign({ gameId });
     }
@@ -153,26 +188,43 @@ export default function LiveGamePage() {
 
   const moveHistory = useMemo(() => chess.history(), [fen]);
 
+  const topPlayerLabel =
+    orientation === 'white'
+      ? `${players.black?.username || 'Guest'} - Black`
+      : `${players.white?.username || 'Guest'} - White`;
+
+  const bottomPlayerLabel =
+    orientation === 'white'
+      ? `${players.white?.username || effectiveUsername} - White`
+      : `${players.black?.username || effectiveUsername} - Black`;
+
+  const topClockMs = orientation === 'white' ? blackClockMs : whiteClockMs;
+  const bottomClockMs = orientation === 'white' ? whiteClockMs : blackClockMs;
+
+  const isMyTurn = myColor ? myColor === turn : true;
+
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 py-6 px-4">
-      {/* Board Left Column */}
       <div className="flex flex-col items-center w-full max-w-[620px]">
         {/* Top Player (Opponent) */}
         <div className="w-full flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
-                orientation === 'white' ? 'bg-zinc-800 border border-zinc-600' : 'bg-white'
+                orientation === 'white' ? 'bg-wood-950 border border-brass-500/40' : 'bg-parchment-100 shadow'
               }`}
             />
-            <span className="text-xs font-bold text-zinc-300">
-              {orientation === 'white' ? 'Opponent (Black)' : 'You (White)'}
+            <span className="text-xs font-serif font-bold text-parchment-300">
+              {topPlayerLabel}
             </span>
+            {((orientation === 'white' && turn === 'b') || (orientation === 'black' && turn === 'w')) && (
+              <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
+            )}
           </div>
 
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono font-bold text-zinc-200">
-            <Clock className="w-3.5 h-3.5 text-zinc-400" />
-            <span>{formatClock(orientation === 'white' ? blackClockMs : whiteClockMs)}</span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-wood-900 border border-wood-800 text-xs font-mono font-bold text-parchment-200 shadow-inner">
+            <Clock className="w-3.5 h-3.5 text-brass-400" />
+            <span>{formatClock(topClockMs)}</span>
           </div>
         </div>
 
@@ -189,7 +241,7 @@ export default function LiveGamePage() {
           turn={turn}
           onMakeMove={handleMakeMove}
           getLegalMovesForSquare={getLegalMovesForSquare}
-          disabled={isGameOver}
+          disabled={isGameOver || !isMyTurn}
         />
 
         {/* Bottom Player (You) */}
@@ -200,19 +252,22 @@ export default function LiveGamePage() {
                 orientation === 'white' ? 'bg-parchment-100 shadow' : 'bg-wood-950 border border-brass-500/40'
               }`}
             />
-            <span className="text-xs font-serif font-bold text-parchment-200">
-              {orientation === 'white' ? 'White' : 'Black'}
+            <span className="text-xs font-serif font-bold text-parchment-100">
+              {bottomPlayerLabel} (You)
             </span>
+            {isMyTurn && !isGameOver && (
+              <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
+            )}
           </div>
 
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-wood-900 border border-wood-800 text-xs font-mono font-bold text-parchment-100 shadow-inner">
               <Clock className="w-3.5 h-3.5 text-brass-400" />
-              <span>{formatClock(orientation === 'white' ? whiteClockMs : blackClockMs)}</span>
+              <span>{formatClock(bottomClockMs)}</span>
             </div>
             <button
               onClick={() => setOrientation((prev) => (prev === 'white' ? 'black' : 'white'))}
-              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 transition-colors"
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1 transition-colors cursor-pointer"
               title="Flip Board"
             >
               <ArrowUpDown className="w-3.5 h-3.5" />
@@ -231,9 +286,8 @@ export default function LiveGamePage() {
         )}
       </div>
 
-      {/* Right Column: Move History & Multi-tab Status */}
+      {/* Right Column: Move History & In-game controls */}
       <div className="w-full lg:w-80 flex flex-col gap-4">
-        {/* Connection Status Card */}
         <div className="bg-wood-900 border border-wood-800 rounded-xl p-3 shadow-md flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <div
@@ -242,13 +296,13 @@ export default function LiveGamePage() {
               }`}
             />
             <span className="text-parchment-300 font-medium">
-              {isConnected ? 'Authoritative Sync Active' : 'Connecting...'}
+              {isConnected ? 'Connected' : 'Connecting...'}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-wood-950 border border-wood-800 text-[10px] text-parchment-400 font-mono">
             <ShieldCheck className="w-3 h-3 text-brass-400" />
-            <span>Tab: {tabRole}</span>
+            <span>{isMyTurn ? 'Your Turn' : "Opponent's Turn"}</span>
           </div>
         </div>
 
@@ -288,7 +342,7 @@ export default function LiveGamePage() {
           <button
             onClick={handleDrawOffer}
             disabled={isGameOver || !isConnected}
-            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40"
+            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 cursor-pointer"
           >
             <Handshake className="w-4 h-4 text-brass-500" />
             <span>Offer Draw</span>
@@ -297,7 +351,7 @@ export default function LiveGamePage() {
           <button
             onClick={handleResign}
             disabled={isGameOver || !isConnected}
-            className={`py-2.5 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 ${
+            className={`py-2.5 px-2 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-40 cursor-pointer ${
               confirmResign
                 ? 'bg-salon-crimson/30 border-salon-crimson text-red-200 animate-pulse'
                 : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800'
@@ -311,4 +365,3 @@ export default function LiveGamePage() {
     </div>
   );
 }
-
