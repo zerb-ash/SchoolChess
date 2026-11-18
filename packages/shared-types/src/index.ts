@@ -20,13 +20,13 @@ export const SYSTEM_LIMITS = {
 // 2. HARDENED AUTHENTICATION SCHEMAS
 // (Pure Username + Password, Zero Unicode Exploit Vector)
 // ==========================================
-export const UsernameRegex = /^[a-zA-Z0-9_-]+$/;
+export const UsernameRegex = /^[a-zA-Z0-9]+$/;
 
 export const UsernameSchema = z
   .string()
   .min(SYSTEM_LIMITS.MIN_USERNAME_LENGTH, { message: `Username must be at least ${SYSTEM_LIMITS.MIN_USERNAME_LENGTH} characters.` })
   .max(SYSTEM_LIMITS.MAX_USERNAME_LENGTH, { message: `Username cannot exceed ${SYSTEM_LIMITS.MAX_USERNAME_LENGTH} characters.` })
-  .regex(UsernameRegex, { message: 'Username can only contain alphanumeric characters, underscores, and hyphens.' })
+  .regex(UsernameRegex, { message: 'Username can only contain letters and numbers. No spaces or special characters allowed.' })
   .transform((val) => val.trim().toLowerCase());
 
 export const PasswordSchema = z

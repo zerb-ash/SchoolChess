@@ -22,22 +22,21 @@ export function buildGameServer() {
     return { status: 'ok', activeRooms: roomManager.getActiveCount(), uptime: process.uptime() };
   });
 
-  app.register(async (wsScope) => {
-    wsScope.get('/ws/game', { websocket: true }, (socket: WebSocket, req) => {
-      let activeGameId: string | null = null;
-      const parsedUrl = new URL(req.url || '', 'http://localhost');
-      const authenticatedUserId =
-        (req.query as any)?.userId ||
-        parsedUrl.searchParams.get('userId') ||
-        `guest_${Math.random().toString(36).substring(2, 8)}`;
-      const authenticatedUsername =
-        (req.query as any)?.username ||
-        parsedUrl.searchParams.get('username') ||
-        (authenticatedUserId.startsWith('guest_') ? 'Guest' : 'Player');
-      let messageCountInWindow = 0;
-      let windowStart = Date.now();
+  const handleWs = (socket: WebSocket, req: any) => {
+    let activeGameId: string | null = null;
+    const parsedUrl = new URL(req.url || '', 'http://localhost');
+    const authenticatedUserId =
+      (req.query as any)?.userId ||
+      parsedUrl.searchParams.get('userId') ||
+      `guest_${Math.random().toString(36).substring(2, 8)}`;
+    const authenticatedUsername =
+      (req.query as any)?.username ||
+      parsedUrl.searchParams.get('username') ||
+      (authenticatedUserId.startsWith('guest_') ? 'Guest' : 'Player');
+    let messageCountInWindow = 0;
+    let windowStart = Date.now();
 
-      socket.on('message', (rawData) => {
+    socket.on('message', (rawData) => {
         const now = Date.now();
         if (now - windowStart > 1000) {
           windowStart = now;
@@ -210,7 +209,12 @@ export function buildGameServer() {
           }
         }
       });
-    });
+  };
+
+  app.register(async (wsScope) => {
+    wsScope.get('/ws/game', { websocket: true }, handleWs);
+    wsScope.get('/ws', { websocket: true }, handleWs);
+    wsScope.get('/', { websocket: true }, handleWs);
   });
 
   return app;

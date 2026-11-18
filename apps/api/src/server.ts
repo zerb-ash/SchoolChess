@@ -240,7 +240,21 @@ export function buildServer(userRepo?: IUserRepository) {
 
   const activePresenceSessions = new Map<string, number>();
 
+  app.options('/api/v1/presence/tunnel', async (req, reply) => {
+    const origin = (req.headers.origin as string) || '*';
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Credentials', 'true');
+    reply.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Cache-Control, X-Requested-With');
+    reply.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    return reply.status(204).send();
+  });
+
   app.get('/api/v1/presence/tunnel', async (req, reply) => {
+    const origin = (req.headers.origin as string) || '*';
+    reply.raw.setHeader('Access-Control-Allow-Origin', origin);
+    reply.raw.setHeader('Access-Control-Allow-Credentials', 'true');
+    reply.raw.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Cache-Control, X-Requested-With');
+
     const token = extractToken(req);
     if (!token) {
       return reply.code(401).send({ message: 'Unauthorized' });

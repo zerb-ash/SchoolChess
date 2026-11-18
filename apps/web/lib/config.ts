@@ -5,7 +5,10 @@ export function getApiBaseUrl(): string {
 }
 
 export function getWsBaseUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
-  return raw.replace(/\/+$/, '');
+  let raw = (process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game').replace(/\/+$/, '');
+  if (!raw.includes('/ws') && !raw.includes(':4001')) {
+    raw += '/ws';
+  }
+  return raw;
 }
 

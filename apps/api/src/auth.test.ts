@@ -11,14 +11,14 @@ test('Auth API - User Registration with ratings seeding', async () => {
     method: 'POST',
     url: '/api/v1/auth/register',
     payload: {
-      username: 'Magnus_Carlsen',
+      username: 'MagnusCarlsen',
       password: 'validPassword123!',
     },
   });
 
   assert.equal(res.statusCode, 201);
   const data = JSON.parse(res.body);
-  assert.equal(data.username, 'magnus_carlsen'); // normalized to lowercase
+  assert.equal(data.username, 'magnuscarlsen'); // normalized to lowercase
   assert.ok(data.id);
   assert.ok(data.token);
 
@@ -101,7 +101,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
     method: 'POST',
     url: '/api/v1/auth/register',
     payload: {
-      username: 'chess_master',
+      username: 'chessmaster',
       password: 'strongPassword99',
     },
   });
@@ -111,7 +111,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
     method: 'POST',
     url: '/api/v1/auth/login',
     payload: {
-      username: 'CHESS_MASTER', // Case-insensitive test
+      username: 'CHESSMASTER', // Case-insensitive test
       password: 'strongPassword99',
     },
   });
@@ -131,7 +131,7 @@ test('Auth API - Login, /me, and Logout lifecycle', async () => {
 
   assert.equal(meRes.statusCode, 200);
   const meData = JSON.parse(meRes.body);
-  assert.equal(meData.user.username, 'chess_master');
+  assert.equal(meData.user.username, 'chessmaster');
 
   // 4. Logout
   const logoutRes = await app.inject({

@@ -30,12 +30,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLocalError(null);
 
     const trimmedUser = username.trim();
+    if (/\s/.test(username)) {
+      setLocalError('Username cannot contain spaces.');
+      return;
+    }
     if (trimmedUser.length < 3 || trimmedUser.length > 20) {
       setLocalError('Username must be between 3 and 20 characters.');
       return;
     }
-    if (!/^[a-zA-Z0-9_-]+$/.test(trimmedUser)) {
-      setLocalError('Username may only contain letters, numbers, underscores, and hyphens.');
+    if (!/^[a-zA-Z0-9]+$/.test(trimmedUser)) {
+      setLocalError('Username can only contain letters and numbers (no special characters or spaces).');
       return;
     }
     if (password.length < 8) {
@@ -143,8 +147,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 required
                 autoComplete="username"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Username"
+                onChange={(e) => {
+                  const cleaned = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+                  setUsername(cleaned);
+                  if (localError) setLocalError(null);
+                }}
+                placeholder="Letters and numbers only"
                 className="w-full pl-9 pr-3 py-2.5 rounded-lg custom-input text-sm text-parchment-100 placeholder:text-parchment-500 transition-colors"
               />
             </div>
