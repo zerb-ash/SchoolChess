@@ -23,6 +23,7 @@ export function getTimeCategory(timeControl?: string): 'bullet' | 'blitz' | 'rap
 export function buildServer(userRepo?: IUserRepository) {
   const app = fastify({
     bodyLimit: 16384,
+    trustProxy: true,
   });
 
   app.register(cookie);
