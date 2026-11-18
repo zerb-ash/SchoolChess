@@ -138,12 +138,12 @@ export default function FindPage() {
                 className="group relative flex items-center gap-4 p-4 rounded-2xl bg-wood-900 border border-wood-800 hover:border-brass-500/50 hover:bg-wood-850 transition-all shadow-md hover:shadow-xl min-h-[105px]"
               >
                 {/* Big Avatar with Online Badge */}
-                <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-2xl overflow-hidden bg-wood-950 border-2 border-brass-500/40 flex items-center justify-center shrink-0 shadow-inner group-hover:border-brass-400 transition-colors">
+                <div className="relative w-16 h-16 min-w-[64px] min-h-[64px] max-w-[64px] max-h-[64px] sm:w-20 sm:h-20 sm:min-w-[80px] sm:min-h-[80px] sm:max-w-[80px] sm:max-h-[80px] rounded-2xl overflow-hidden bg-wood-950 border-2 border-brass-500/40 flex items-center justify-center shrink-0 shadow-inner group-hover:border-brass-400 transition-colors">
                   {player.avatarUrl ? (
                     <img
                       src={player.avatarUrl}
                       alt={player.username}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      className="w-full h-full max-w-full max-h-full object-cover shrink-0 aspect-square group-hover:scale-105 transition-transform"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                       }}

@@ -5,6 +5,7 @@ import React from 'react';
 interface MiniBoardProps {
   fen?: string;
   size?: number;
+  className?: string;
 }
 
 function parseFenTo8x8(fen?: string): (string | null)[][] {
@@ -29,13 +30,14 @@ function parseFenTo8x8(fen?: string): (string | null)[][] {
   return board;
 }
 
-export const MiniBoard: React.FC<MiniBoardProps> = ({ fen, size = 64 }) => {
+export const MiniBoard: React.FC<MiniBoardProps> = ({ fen, size = 64, className = '' }) => {
   const board = parseFenTo8x8(fen);
+  const hasCustomSizeClass = className.includes('w-') || className.includes('h-');
 
   return (
     <div
-      style={{ width: size, height: size }}
-      className="grid grid-cols-8 grid-rows-8 rounded-lg overflow-hidden border border-wood-700/80 shrink-0 shadow-md bg-wood-950"
+      style={!hasCustomSizeClass && size ? { width: size, height: size } : undefined}
+      className={`grid grid-cols-8 grid-rows-8 rounded-lg overflow-hidden border border-wood-700/80 shrink-0 shadow-md bg-wood-950 ${className}`}
     >
       {board.map((row, rIdx) =>
         row.map((piece, fIdx) => {
@@ -63,4 +65,3 @@ export const MiniBoard: React.FC<MiniBoardProps> = ({ fen, size = 64 }) => {
     </div>
   );
 };
-

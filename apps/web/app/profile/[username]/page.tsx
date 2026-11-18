@@ -626,36 +626,39 @@ export default function UserProfilePage() {
                   return (
                     <div
                       key={g.id}
-                      className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-wood-850/50 -mx-3 px-3 rounded-xl transition-colors"
+                      className="py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 hover:bg-wood-850/50 -mx-2 sm:-mx-3 px-2 sm:px-3 rounded-xl transition-colors"
                     >
-                      {/* Left: 156px MiniBoard (1.5x) + Speed Badge + Player details */}
-                      <div className="flex items-center gap-4 sm:gap-5 min-w-0">
-                        {/* 1.5x Larger Final Position Mini Board Preview (156px) */}
+                      {/* Left: Responsive MiniBoard (smaller on mobile, 156px on PC) + Speed Badge + Player details */}
+                      <div className="flex items-center gap-2.5 sm:gap-5 min-w-0">
+                        {/* Final Position Mini Board Preview: 80px on mobile, 156px on PC */}
                         <div className="shrink-0 rounded-lg overflow-hidden border border-wood-700/60 shadow-md">
-                          <MiniBoard fen={g.finalFen} size={156} />
+                          <MiniBoard
+                            fen={g.finalFen}
+                            className="w-20 h-20 sm:w-[156px] sm:h-[156px]"
+                          />
                         </div>
 
-                        {/* Game Type Logo & Time (Prominent Chess.com layout) */}
-                        <div className="flex flex-col items-center justify-center gap-1 w-16 shrink-0 text-center">
-                          <speed.Icon className="w-8 h-8 drop-shadow" />
-                          <span className="text-xs font-bold text-parchment-200">
+                        {/* Game Type Logo & Time (compact on mobile, prominent on PC) */}
+                        <div className="flex flex-col items-center justify-center gap-0.5 sm:gap-1 w-11 sm:w-16 shrink-0 text-center">
+                          <speed.Icon className="w-5 h-5 sm:w-8 sm:h-8 drop-shadow" />
+                          <span className="text-[10px] sm:text-xs font-bold text-parchment-200">
                             {speed.timeLabel}
                           </span>
-                          <span className="text-[10px] uppercase tracking-wider text-parchment-400 font-bold">
+                          <span className="text-[8px] sm:text-[10px] uppercase tracking-wider text-parchment-400 font-bold">
                             {speed.name}
                           </span>
                         </div>
 
                         {/* Player Names & Ratings with Profile Avatars & Selective Hyperlinks */}
-                        <div className="flex flex-col gap-2.5 min-w-0">
+                        <div className="flex flex-col gap-1.5 sm:gap-2.5 min-w-0">
                           {/* White Player */}
-                          <div className="flex items-center gap-2.5 text-sm">
+                          <div className="flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm">
                             {isWhiteProfile ? (
-                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner shrink-0">
+                              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner shrink-0">
                                 {g.whiteAvatarUrl ? (
                                   <img src={g.whiteAvatarUrl} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  <span className="font-serif font-bold text-xs text-brass-400">
+                                  <span className="font-serif font-bold text-[10px] sm:text-xs text-brass-400">
                                     {g.whiteUsername.charAt(0).toUpperCase()}
                                   </span>
                                 )}
@@ -666,11 +669,11 @@ export default function UserProfilePage() {
                                 className="shrink-0 group/av"
                                 title={`View @${g.whiteUsername}'s profile`}
                               >
-                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner group-hover/av:border-brass-400 transition-colors">
+                                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner group-hover/av:border-brass-400 transition-colors">
                                   {g.whiteAvatarUrl ? (
                                     <img src={g.whiteAvatarUrl} alt="" className="w-full h-full object-cover" />
                                   ) : (
-                                    <span className="font-serif font-bold text-xs text-brass-400">
+                                    <span className="font-serif font-bold text-[10px] sm:text-xs text-brass-400">
                                       {g.whiteUsername.charAt(0).toUpperCase()}
                                     </span>
                                   )}
@@ -678,32 +681,32 @@ export default function UserProfilePage() {
                               </Link>
                             )}
 
-                            <div className="w-3 h-3 rounded-sm bg-parchment-100 border border-wood-700 shrink-0" />
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-parchment-100 border border-wood-700 shrink-0" />
                             {isWhiteProfile ? (
-                              <span className="font-bold text-parchment-100 truncate max-w-[140px] sm:max-w-[200px]">
+                              <span className="font-bold text-parchment-100 truncate max-w-[85px] xs:max-w-[130px] sm:max-w-[200px]">
                                 {g.whiteUsername}
                               </span>
                             ) : (
                               <Link
                                 href={`/profile/${g.whiteUsername}`}
-                                className="font-semibold text-parchment-300 hover:underline hover:text-brass-300 transition-colors truncate max-w-[140px] sm:max-w-[200px]"
+                                className="font-semibold text-parchment-300 hover:underline hover:text-brass-300 transition-colors truncate max-w-[85px] xs:max-w-[130px] sm:max-w-[200px]"
                               >
                                 {g.whiteUsername}
                               </Link>
                             )}
-                            <span className="text-xs font-mono text-parchment-400 font-medium">
+                            <span className="text-[11px] sm:text-xs font-mono text-parchment-400 font-medium">
                               ({g.whiteRating})
                             </span>
                           </div>
 
                           {/* Black Player */}
-                          <div className="flex items-center gap-2.5 text-sm">
+                          <div className="flex items-center gap-2 sm:gap-2.5 text-xs sm:text-sm">
                             {isBlackProfile ? (
-                              <div className="w-9 h-9 rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner shrink-0">
+                              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner shrink-0">
                                 {g.blackAvatarUrl ? (
                                   <img src={g.blackAvatarUrl} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  <span className="font-serif font-bold text-xs text-brass-400">
+                                  <span className="font-serif font-bold text-[10px] sm:text-xs text-brass-400">
                                     {g.blackUsername.charAt(0).toUpperCase()}
                                   </span>
                                 )}
@@ -714,11 +717,11 @@ export default function UserProfilePage() {
                                 className="shrink-0 group/av"
                                 title={`View @${g.blackUsername}'s profile`}
                               >
-                                <div className="w-9 h-9 rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner group-hover/av:border-brass-400 transition-colors">
+                                <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-md sm:rounded-lg overflow-hidden bg-wood-950 border border-wood-700 flex items-center justify-center shadow-inner group-hover/av:border-brass-400 transition-colors">
                                   {g.blackAvatarUrl ? (
                                     <img src={g.blackAvatarUrl} alt="" className="w-full h-full object-cover" />
                                   ) : (
-                                    <span className="font-serif font-bold text-xs text-brass-400">
+                                    <span className="font-serif font-bold text-[10px] sm:text-xs text-brass-400">
                                       {g.blackUsername.charAt(0).toUpperCase()}
                                     </span>
                                   )}
@@ -726,20 +729,20 @@ export default function UserProfilePage() {
                               </Link>
                             )}
 
-                            <div className="w-3 h-3 rounded-sm bg-wood-950 border border-brass-500/40 shrink-0" />
+                            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-sm bg-wood-950 border border-brass-500/40 shrink-0" />
                             {isBlackProfile ? (
-                              <span className="font-bold text-parchment-100 truncate max-w-[140px] sm:max-w-[200px]">
+                              <span className="font-bold text-parchment-100 truncate max-w-[85px] xs:max-w-[130px] sm:max-w-[200px]">
                                 {g.blackUsername}
                               </span>
                             ) : (
                               <Link
                                 href={`/profile/${g.blackUsername}`}
-                                className="font-semibold text-parchment-300 hover:underline hover:text-brass-300 transition-colors truncate max-w-[140px] sm:max-w-[200px]"
+                                className="font-semibold text-parchment-300 hover:underline hover:text-brass-300 transition-colors truncate max-w-[85px] xs:max-w-[130px] sm:max-w-[200px]"
                               >
                                 {g.blackUsername}
                               </Link>
                             )}
-                            <span className="text-xs font-mono text-parchment-400 font-medium">
+                            <span className="text-[11px] sm:text-xs font-mono text-parchment-400 font-medium">
                               ({g.blackRating})
                             </span>
                           </div>
