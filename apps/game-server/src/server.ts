@@ -28,13 +28,23 @@ export function buildGameServer() {
 
   app.post('/internal/rooms/:gameId/terminate', async (req, reply) => {
     const { gameId } = req.params as { gameId: string };
-    const room = roomManager.getRoom(gameId);
+    let room = roomManager.getRoom(gameId);
     if (!room) {
-      return reply.code(404).send({ error: 'ROOM_NOT_FOUND', message: 'Room not found or already ended' });
+      for (const r of roomManager.getAllRawRooms()) {
+        if (r.gameId === gameId || r.gameId.includes(gameId) || gameId.includes(r.gameId)) {
+          room = r;
+          break;
+        }
+      }
+    }
+    if (!room) {
+      roomManager.markCompleted(gameId, '1/2-1/2', 'aborted');
+      return reply.send({ success: true, message: 'Room was already closed or completed' });
     }
     room.forceTerminate();
-    roomManager.removeRoom(gameId);
-    return reply.send({ success: true, message: `Game ${gameId} terminated successfully.` });
+    roomManager.markCompleted(room.gameId, '1/2-1/2', 'aborted');
+    roomManager.removeRoom(room.gameId);
+    return reply.send({ success: true, message: `Game ${room.gameId} terminated successfully.` });
   });
 
   const handleWs = (socket: WebSocket, req: any) => {
@@ -75,6 +85,24 @@ export function buildGameServer() {
 
               activeGameId = gameId;
 
+              // 1. If game has already completed, immediately notify client and close
+              if (roomManager.isCompleted(gameId)) {
+                const info = roomManager.getCompletedInfo(gameId);
+                socket.send(
+                  JSON.stringify({
+                    type: 'game:over',
+                    payload: {
+                      gameId,
+                      result: info?.result || '1/2-1/2',
+                      termination: info?.termination || 'abandoned',
+                      completed: true,
+                    },
+                  })
+                );
+                socket.close(1000, 'GAME_ALREADY_COMPLETED');
+                return;
+              }
+
               let room = roomManager.getRoom(gameId);
               if (!room) {
                 const firstPlayerIsBlack = preferredColor === 'black';
@@ -96,6 +124,22 @@ export function buildGameServer() {
                   rated: true,
                   timeControl: tc,
                 });
+
+                if (!room) {
+                  socket.send(
+                    JSON.stringify({
+                      type: 'game:over',
+                      payload: {
+                        gameId,
+                        result: '1/2-1/2',
+                        termination: 'abandoned',
+                        completed: true,
+                      },
+                    })
+                  );
+                  socket.close(1000, 'GAME_ALREADY_COMPLETED');
+                  return;
+                }
               } else {
                 if (room.getStatus() !== 'active') {
                   socket.send(
@@ -105,21 +149,52 @@ export function buildGameServer() {
                         gameId,
                         result: '1/2-1/2',
                         termination: 'abandoned',
+                        completed: true,
                       },
                     })
                   );
+                  socket.close(1000, 'GAME_OVER');
                   return;
                 }
 
-                // If room is waiting for an opponent and the creator has disconnected
-                if (!room.isBothSeated()) {
-                  const isCreatorWhite = !!room.white.id && room.white.id !== 'Waiting...';
-                  const isCreatorBlack = !!room.black.id && room.black.id !== 'Waiting...' && room.black.id !== 'opponent_placeholder';
-                  const creatorConnected = (isCreatorWhite && room.isWhiteConnected()) || (isCreatorBlack && room.isBlackConnected());
+                // If both players are seated: seats are permanently locked
+                if (room.isBothSeated()) {
+                  const isWhite = room.white.id === authenticatedUserId;
+                  const isBlack = room.black.id === authenticatedUserId;
+
+                  // An outsider / third party has connected with the game link
+                  if (!isWhite && !isBlack) {
+                    // If either player has left / closed their tab: VOID AND ABORT THE GAME
+                    if (!room.isWhiteConnected() || !room.isBlackConnected()) {
+                      room.finishGame('*', 'aborted');
+                      roomManager.markCompleted(gameId, '*', 'aborted');
+                      socket.send(
+                        JSON.stringify({
+                          type: 'game:over',
+                          payload: {
+                            gameId,
+                            result: '*',
+                            termination: 'aborted',
+                            message: 'Game voided due to player disconnect and unauthorized entry.',
+                            completed: true,
+                          },
+                        })
+                      );
+                      socket.close(1000, 'GAME_VOIDED');
+                      return;
+                    }
+                    // Both players are connected: third party spectates only (no seating)
+                  }
+                } else {
+                  // Only one player seated so far (waiting for opponent)
+                  const hasWhite = !!room.white.id && room.white.id !== 'Waiting...' && room.white.id !== '';
+                  const hasBlack = !!room.black.id && room.black.id !== 'Waiting...' && room.black.id !== '' && room.black.id !== 'opponent_placeholder';
+                  const creatorConnected = (hasWhite && room.isWhiteConnected()) || (hasBlack && room.isBlackConnected());
                   const isCreatorRejoining = room.white.id === authenticatedUserId || room.black.id === authenticatedUserId;
 
                   if (!creatorConnected && !isCreatorRejoining) {
                     room.abortAbandonedRoom();
+                    roomManager.markCompleted(gameId, '1/2-1/2', 'abandoned');
                     socket.send(
                       JSON.stringify({
                         type: 'game:over',
@@ -127,44 +202,46 @@ export function buildGameServer() {
                           gameId,
                           result: '1/2-1/2',
                           termination: 'abandoned',
+                          completed: true,
                         },
                       })
                     );
+                    socket.close(1000, 'GAME_ABANDONED');
                     return;
                   }
-                }
 
-                const isAlreadyWhite = room.white.id === authenticatedUserId;
-                const isAlreadyBlack = room.black.id === authenticatedUserId;
+                  const isAlreadyWhite = room.white.id === authenticatedUserId;
+                  const isAlreadyBlack = room.black.id === authenticatedUserId;
 
-                if (!isAlreadyWhite && !isAlreadyBlack) {
-                  const isWhiteEmpty = !room.white.id || room.white.id === 'Waiting...' || room.white.id === '';
-                  const isBlackEmpty = !room.black.id || room.black.id === 'Waiting...' || room.black.id === '' || room.black.id === 'opponent_placeholder';
+                  if (!isAlreadyWhite && !isAlreadyBlack) {
+                    const isWhiteEmpty = !room.white.id || room.white.id === 'Waiting...' || room.white.id === '';
+                    const isBlackEmpty = !room.black.id || room.black.id === 'Waiting...' || room.black.id === '' || room.black.id === 'opponent_placeholder';
 
-                  if (preferredColor === 'white' && isWhiteEmpty) {
-                    room.setWhitePlayer({
-                      id: authenticatedUserId,
-                      username: authenticatedUsername,
-                      rating: 200,
-                    });
-                  } else if (preferredColor === 'black' && isBlackEmpty) {
-                    room.setBlackPlayer({
-                      id: authenticatedUserId,
-                      username: authenticatedUsername,
-                      rating: 200,
-                    });
-                  } else if (isWhiteEmpty) {
-                    room.setWhitePlayer({
-                      id: authenticatedUserId,
-                      username: authenticatedUsername,
-                      rating: 200,
-                    });
-                  } else if (isBlackEmpty) {
-                    room.setBlackPlayer({
-                      id: authenticatedUserId,
-                      username: authenticatedUsername,
-                      rating: 200,
-                    });
+                    if (preferredColor === 'white' && isWhiteEmpty) {
+                      room.setWhitePlayer({
+                        id: authenticatedUserId,
+                        username: authenticatedUsername,
+                        rating: 200,
+                      });
+                    } else if (preferredColor === 'black' && isBlackEmpty) {
+                      room.setBlackPlayer({
+                        id: authenticatedUserId,
+                        username: authenticatedUsername,
+                        rating: 200,
+                      });
+                    } else if (isWhiteEmpty) {
+                      room.setWhitePlayer({
+                        id: authenticatedUserId,
+                        username: authenticatedUsername,
+                        rating: 200,
+                      });
+                    } else if (isBlackEmpty) {
+                      room.setBlackPlayer({
+                        id: authenticatedUserId,
+                        username: authenticatedUsername,
+                        rating: 200,
+                      });
+                    }
                   }
                 }
               }

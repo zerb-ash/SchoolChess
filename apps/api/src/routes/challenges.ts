@@ -200,16 +200,31 @@ export async function challengesRoutes(app: FastifyInstance) {
 }
 
 export function getAllActiveChallenges(): ChallengeData[] {
-  return Array.from(activeChallenges.values());
+  const now = Date.now();
+  for (const [token, c] of activeChallenges.entries()) {
+    if (c.status !== 'open' || now - c.createdAt > 30 * 60 * 1000) {
+      activeChallenges.delete(token);
+      shortCodeMap.delete(c.shortCode);
+    }
+  }
+  return Array.from(activeChallenges.values()).filter((c) => c.status === 'open');
 }
 
 export function cancelChallenge(idOrToken: string): boolean {
+  let found = false;
   for (const [token, c] of activeChallenges.entries()) {
-    if (c.id === idOrToken || c.token === idOrToken || c.gameId === idOrToken) {
+    if (
+      c.token === idOrToken ||
+      c.id === idOrToken ||
+      c.gameId === idOrToken ||
+      c.shortCode === idOrToken ||
+      token.startsWith(idOrToken) ||
+      idOrToken.startsWith(token)
+    ) {
       activeChallenges.delete(token);
       shortCodeMap.delete(c.shortCode);
-      return true;
+      found = true;
     }
   }
-  return false;
+  return found;
 }

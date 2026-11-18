@@ -343,7 +343,7 @@ export class GameRoom {
     this.finishGame(result, 'timeout', winnerId);
   }
 
-  private finishGame(result: GameResult, termination: GameTermination, winnerId?: string): void {
+  public finishGame(result: GameResult, termination: GameTermination, winnerId?: string): void {
     if (this.status === 'completed' || this.status === 'aborted') return;
     this.status = termination === 'aborted' || (termination === 'abandoned' && this.moveNumber === 0) ? 'aborted' : 'completed';
     this.clock.stop();
@@ -423,6 +423,7 @@ export class GameRoom {
   }
 
   public forceTerminate(reason: string = 'Game terminated by administrator.'): void {
+    this.finishGame('1/2-1/2', 'aborted');
     this.broadcast({
       type: 'game:over',
       payload: {
@@ -430,6 +431,7 @@ export class GameRoom {
         result: '1/2-1/2',
         termination: 'aborted',
         message: reason,
+        completed: true,
       },
     });
     this.status = 'aborted';

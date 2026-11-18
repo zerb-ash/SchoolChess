@@ -63,6 +63,7 @@ export interface IUserRepository {
   incrementViews?(userId: string): Promise<number>;
   recordGame?(game: CompletedGameRecord): Promise<void>;
   getUserGames?(userId: string): Promise<CompletedGameRecord[]>;
+  getAllGames?(): Promise<CompletedGameRecord[]>;
   updateLastSeen?(userId: string, date: Date): Promise<void>;
 }
 
@@ -344,6 +345,10 @@ export class InMemoryUserRepository implements IUserRepository {
     );
   }
 
+  async getAllGames(): Promise<CompletedGameRecord[]> {
+    return [...this.games];
+  }
+
   async updateLastSeen(userId: string, date: Date): Promise<void> {
     const user = this.users.get(userId);
     if (user) {
@@ -440,6 +445,10 @@ export class ResilientUserRepository implements IUserRepository {
 
   async getUserGames(userId: string): Promise<CompletedGameRecord[]> {
     return this.inMemory.getUserGames(userId);
+  }
+
+  async getAllGames(): Promise<CompletedGameRecord[]> {
+    return this.inMemory.getAllGames();
   }
 
   async updateLastSeen(userId: string, date: Date): Promise<void> {

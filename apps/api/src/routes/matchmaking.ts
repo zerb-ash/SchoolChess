@@ -170,20 +170,28 @@ export async function matchmakingRoutes(app: FastifyInstance) {
 }
 
 export function getAllMatchmakingPlayers(): QueuedPlayer[] {
+  const now = Date.now();
+  for (const [userId, p] of playerLookup.entries()) {
+    if (now - p.enqueuedAt > 10 * 60 * 1000) {
+      cancelMatchmakingForUser(userId);
+    }
+  }
   return Array.from(playerLookup.values());
 }
 
-export function cancelMatchmakingForUser(userId: string): boolean {
-  const player = playerLookup.get(userId);
-  if (player) {
-    const pool = queues.get(player.timeControl) || [];
-    queues.set(
-      player.timeControl,
-      pool.filter((p) => p.userId !== userId)
-    );
-    playerLookup.delete(userId);
-    return true;
+export function cancelMatchmakingForUser(userIdOrPartial: string): boolean {
+  let found = false;
+  for (const [userId, player] of playerLookup.entries()) {
+    if (userId === userIdOrPartial || userId.startsWith(userIdOrPartial) || userIdOrPartial.startsWith(userId)) {
+      const pool = queues.get(player.timeControl) || [];
+      queues.set(
+        player.timeControl,
+        pool.filter((p) => p.userId !== userId)
+      );
+      playerLookup.delete(userId);
+      found = true;
+    }
   }
-  return false;
+  return found;
 }
 

@@ -50,6 +50,7 @@ test('GameRoom - move validation and sequence lock', () => {
     rated: true,
   });
 
+  assert.ok(room);
   const state = room.getStatePayload();
   assert.equal(state.turn, 'w');
   assert.equal(state.moveNumber, 0);

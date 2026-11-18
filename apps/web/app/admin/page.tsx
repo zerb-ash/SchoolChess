@@ -228,6 +228,7 @@ export default function AdminPage() {
       const res = await fetch(`${API_BASE}/api/v1/admin/games/${encodeURIComponent(gameId)}/terminate`, {
         method: 'POST',
         headers: getHeaders(),
+        body: JSON.stringify({}),
         credentials: 'include',
       });
       if (res.ok) {
@@ -235,6 +236,9 @@ export default function AdminPage() {
         setTimeout(() => setActionMessage(null), 4000);
         fetchGames();
         fetchOverview();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(`Error terminating: ${data.message || res.statusText}`);
       }
     } catch {
       alert('Failed to terminate game.');

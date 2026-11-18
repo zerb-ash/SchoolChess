@@ -26,6 +26,19 @@ export function buildServer(userRepo?: IUserRepository) {
     trustProxy: true,
   });
 
+  // Fastify JSON body parser allowing empty bodies without 400 Bad Request
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body: string, done) => {
+    try {
+      if (!body || !body.trim()) {
+        return done(null, {});
+      }
+      done(null, JSON.parse(body));
+    } catch (err: any) {
+      err.statusCode = 400;
+      done(err, undefined);
+    }
+  });
+
   app.register(cookie);
   app.register(cors, {
     origin: true,
@@ -476,7 +489,7 @@ export function buildServer(userRepo?: IUserRepository) {
     if (!verifyAdmin(req, reply)) return;
 
     const allUsers = (await repo.getAllUsers?.()) || [];
-    const completedGames = repo.getUserGames ? (repo as any).games || [] : [];
+    const completedGames = repo.getAllGames ? await repo.getAllGames() : ((repo as any).games || []);
     const challenges = getAllActiveChallenges();
     const matchmaking = getAllMatchmakingPlayers();
 
@@ -588,6 +601,8 @@ export function buildServer(userRepo?: IUserRepository) {
     try {
       const gsRes = await fetch(`http://127.0.0.1:4001/internal/rooms/${encodeURIComponent(id)}/terminate`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
       });
       if (gsRes.ok) terminatedInGs = true;
     } catch {}
@@ -668,7 +683,7 @@ export function buildServer(userRepo?: IUserRepository) {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
 
-    const completedGames: any[] = repo.getUserGames ? (repo as any).games || [] : [];
+    const completedGames: any[] = repo.getAllGames ? await repo.getAllGames() : ((repo as any).games || []);
     const total = completedGames.length;
     const totalPages = Math.ceil(total / limitNum) || 1;
     const start = (pageNum - 1) * limitNum;

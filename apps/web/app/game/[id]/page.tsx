@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useMemo, useRef, Suspense } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
 import { Chessboard } from '../../../components/board/Chessboard';
 import { useAppSettings } from '../../../lib/useSettings';
@@ -13,6 +13,7 @@ import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, Al
 import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
 
 function LiveGameContent() {
+  const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
   const gameId = (params?.id as string) || 'default-room';
@@ -57,7 +58,8 @@ function LiveGameContent() {
   const [whiteClockMs, setWhiteClockMs] = useState(300000);
   const [blackClockMs, setBlackClockMs] = useState(300000);
   const [isConnected, setIsConnected] = useState(false);
-  const [gameOverData, setGameOverData] = useState<{ result: string; termination: string; winnerId?: string } | null>(null);
+  const [gameOverData, setGameOverData] = useState<{ result: string; termination: string; winnerId?: string; completed?: boolean } | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
   const [drawOfferedByOpponent, setDrawOfferedByOpponent] = useState(false);
   const [drawOfferNotice, setDrawOfferNotice] = useState<string | null>(null);
@@ -186,6 +188,7 @@ function LiveGameContent() {
       onGameOver: (data) => {
         setGameOverData(data);
         soundSystem.playGameOver();
+        setRedirectCountdown((prev) => (prev !== null ? prev : 10));
       },
       onDrawOffered: (data) => {
         if (myColor && data.fromColor !== myColor) {
@@ -227,6 +230,25 @@ function LiveGameContent() {
     }, 1000);
     return () => clearInterval(timer);
   }, [opponentReconnectSec]);
+
+  // Auto-navigate to /play 10 seconds after match concludes
+  useEffect(() => {
+    if (redirectCountdown === null) return;
+    if (redirectCountdown <= 0) {
+      router.push('/play');
+      return;
+    }
+    const timer = setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev === null || prev <= 1) {
+          router.push('/play');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [redirectCountdown, router]);
 
   // Local clock countdown for the active turn (only when both seated and active)
   useEffect(() => {
@@ -630,11 +652,26 @@ function LiveGameContent() {
 
         {/* Game Over Banner */}
         {gameOverData && (
-          <div className="w-full mt-4 p-4 rounded-xl bg-wood-900 border border-brass-500/40 text-center flex items-center justify-center gap-3 animate-fadeIn shadow-2xl">
-            <Trophy className="w-5 h-5 text-brass-400" />
-            <span className="font-serif font-bold text-parchment-100 text-sm">
-              Game Over: {gameOverData.result} ({gameOverData.termination})
-            </span>
+          <div className="w-full mt-4 p-4 rounded-xl bg-wood-900 border border-brass-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn shadow-2xl">
+            <div className="flex items-center gap-3">
+              <Trophy className="w-5 h-5 text-brass-400 shrink-0" />
+              <div className="text-left">
+                <div className="font-serif font-bold text-parchment-100 text-sm">
+                  Game Over: {gameOverData.result} ({gameOverData.termination})
+                </div>
+                {redirectCountdown !== null && (
+                  <div className="text-xs text-parchment-400 mt-0.5 font-sans">
+                    Returning to lobby in <span className="text-brass-400 font-bold font-mono">{redirectCountdown}</span>s...
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={() => router.push('/play')}
+              className="px-4 py-2 rounded-lg bg-brass-600 hover:bg-brass-500 text-wood-950 font-bold text-xs shadow-md transition-colors cursor-pointer shrink-0"
+            >
+              Return to Play
+            </button>
           </div>
         )}
       </div>
