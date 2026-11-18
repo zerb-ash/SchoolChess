@@ -7,7 +7,7 @@ interface ChessCrownIconProps {
 export const ChessCrownIcon: React.FC<ChessCrownIconProps> = ({ className = 'w-6 h-6' }) => {
   return (
     <svg
-      viewBox="0 0 512 512"
+      viewBox="80 50 352 428"
       xmlns="http://www.w3.org/2000/svg"
       fill="currentColor"
       className={className}

@@ -47,11 +47,11 @@ export const Navbar: React.FC = () => {
         <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Far Left: XChess Logo */}
           <div className="flex items-center justify-start min-w-[140px] sm:min-w-[180px]">
-            <Link href="/" className="flex items-center gap-2 group select-none">
-              <div className="w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center shrink-0 text-parchment-100 group-hover:text-brass-300 transition-colors">
-                <ChessCrownIcon className="w-full h-full" />
-              </div>
-              <span className="font-serif text-lg sm:text-xl font-bold tracking-wider text-parchment-100 group-hover:text-brass-300 transition-colors flex items-center">
+            <Link href="/" className="inline-flex items-baseline gap-2 group select-none">
+              <span className="w-5 h-5 sm:w-6 sm:h-6 inline-block shrink-0 text-parchment-100 group-hover:text-brass-300 transition-colors align-baseline translate-y-[1px]">
+                <ChessCrownIcon className="w-full h-full block" />
+              </span>
+              <span className="font-serif text-lg sm:text-xl font-bold tracking-wider text-parchment-100 group-hover:text-brass-300 transition-colors leading-none">
                 X<span className="text-brass-400 font-normal">Chess</span>
               </span>
             </Link>
