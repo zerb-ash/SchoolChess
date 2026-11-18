@@ -3,8 +3,8 @@ import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import url from 'node:url';
 import { registerAuthRoutes, COOKIE_NAME, extractToken } from './routes/auth.js';
-import { challengesRoutes } from './routes/challenges.js';
-import { matchmakingRoutes } from './routes/matchmaking.js';
+import { challengesRoutes, getAllActiveChallenges, cancelChallenge } from './routes/challenges.js';
+import { matchmakingRoutes, getAllMatchmakingPlayers, cancelMatchmakingForUser } from './routes/matchmaking.js';
 import { sessionStore } from './auth/session.js';
 import { IUserRepository, InMemoryUserRepository, PostgresUserRepository, ResilientUserRepository } from './auth/user-repository.js';
 import { createDatabaseClient } from '@schoolchess/database';
@@ -406,6 +406,282 @@ export function buildServer(userRepo?: IUserRepository) {
     },
     { prefix: '/api/v1/auth' }
   );
+
+  // Public user search with pagination
+  app.get('/api/v1/users/search', async (req, reply) => {
+    const { q = '', page = '1', limit = '10' } = req.query as { q?: string; page?: string; limit?: string };
+    const query = q.trim().toLowerCase();
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    const allUsers = (await repo.getAllUsers?.()) || [];
+    const filtered = query
+      ? allUsers.filter((u) => u.username.toLowerCase().includes(query))
+      : allUsers;
+
+    const total = filtered.length;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+    const start = (pageNum - 1) * limitNum;
+    const paginated = filtered.slice(start, start + limitNum);
+
+    const results = await Promise.all(
+      paginated.map(async (u) => {
+        const ratingsList = (await repo.getUserRatings(u.id)) || [];
+        const fide = ratingsList.find((r) => r.system === 'fide' && r.category === 'blitz')?.rating || 200;
+        const rapid = ratingsList.find((r) => r.system === 'fide' && r.category === 'rapid')?.rating || 200;
+        const bullet = ratingsList.find((r) => r.system === 'fide' && r.category === 'bullet')?.rating || 200;
+        const isOnline = activePresenceSessions.has(u.id);
+
+        return {
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.avatarUrl || '',
+          bio: u.bio || 'No bio',
+          createdAt: u.createdAt,
+          lastSeenAt: u.lastSeenAt || u.createdAt,
+          views: u.views || 0,
+          isOnline,
+          rating: fide,
+          ratings: { fide, rapid, bullet },
+        };
+      })
+    );
+
+    return reply.send({
+      users: results,
+      total,
+      page: pageNum,
+      totalPages,
+      limit: limitNum,
+    });
+  });
+
+  // Admin validation helper
+  const verifyAdmin = (req: any, reply: any): boolean => {
+    const token = extractToken(req);
+    if (!token) {
+      reply.code(401).send({ error: 'UNAUTHORIZED', message: 'Admin authentication required.' });
+      return false;
+    }
+    const session = sessionStore.getSession(token);
+    if (!session || session.username.toLowerCase() !== 'admin') {
+      reply.code(403).send({ error: 'FORBIDDEN', message: 'Owner / Administrator privileges required.' });
+      return false;
+    }
+    return true;
+  };
+
+  // Admin: Analytics & Overview
+  app.get('/api/v1/admin/overview', async (req, reply) => {
+    if (!verifyAdmin(req, reply)) return;
+
+    const allUsers = (await repo.getAllUsers?.()) || [];
+    const completedGames = repo.getUserGames ? (repo as any).games || [] : [];
+    const challenges = getAllActiveChallenges();
+    const matchmaking = getAllMatchmakingPlayers();
+
+    let runningRooms: any[] = [];
+    try {
+      const gsRes = await fetch('http://127.0.0.1:4001/internal/rooms');
+      if (gsRes.ok) {
+        const gsData = (await gsRes.json()) as { rooms?: any[] };
+        runningRooms = gsData.rooms || [];
+      }
+    } catch {
+      // Game server might be local
+    }
+
+    const onlineUsernames: string[] = [];
+    for (const [userId] of activePresenceSessions.entries()) {
+      const u = allUsers.find((usr) => usr.id === userId);
+      if (u) onlineUsernames.push(u.username);
+    }
+
+    return reply.send({
+      totalUsers: allUsers.length,
+      totalGames: completedGames.length,
+      onlineCount: activePresenceSessions.size,
+      onlineUsers: onlineUsernames,
+      runningGamesCount: runningRooms.length,
+      challengesCount: challenges.length,
+      matchmakingCount: matchmaking.length,
+      system: {
+        uptimeSeconds: Math.floor(process.uptime()),
+        memoryMb: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        nodeVersion: process.version,
+      },
+    });
+  });
+
+  // Admin: View all running games, challenges, and matchmaking
+  app.get('/api/v1/admin/games', async (req, reply) => {
+    if (!verifyAdmin(req, reply)) return;
+
+    const { page = '1', limit = '10' } = req.query as { page?: string; limit?: string };
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    let liveRooms: any[] = [];
+    try {
+      const gsRes = await fetch('http://127.0.0.1:4001/internal/rooms');
+      if (gsRes.ok) {
+        const gsData = (await gsRes.json()) as { rooms?: any[] };
+        liveRooms = (gsData.rooms || []).map((r: any) => ({
+          type: 'live_game',
+          id: r.gameId,
+          white: r.white,
+          black: r.black,
+          fen: r.fen,
+          status: r.status,
+          timeControl: r.timeControl,
+          moveNumber: r.moveNumber,
+          startedAt: r.serverTimestamp || Date.now(),
+        }));
+      }
+    } catch {
+      // Game server offline
+    }
+
+    const challenges = getAllActiveChallenges().map((c) => ({
+      type: 'challenge',
+      id: c.token,
+      gameId: c.gameId,
+      creator: { id: c.creatorId, username: c.creatorUsername },
+      timeControl: c.timeControl,
+      status: c.status,
+      shortCode: c.shortCode,
+      startedAt: c.createdAt,
+    }));
+
+    const matchmaking = getAllMatchmakingPlayers().map((m) => ({
+      type: 'matchmaking',
+      id: m.userId,
+      player: { id: m.userId, username: m.username, rating: m.rating },
+      timeControl: m.timeControl,
+      status: 'queued',
+      startedAt: m.enqueuedAt,
+    }));
+
+    const allRunning = [...liveRooms, ...challenges, ...matchmaking];
+    const total = allRunning.length;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+    const start = (pageNum - 1) * limitNum;
+    const paginated = allRunning.slice(start, start + limitNum);
+
+    return reply.send({
+      games: paginated,
+      total,
+      page: pageNum,
+      totalPages,
+      limit: limitNum,
+    });
+  });
+
+  // Admin: Force-terminate running game, challenge, or matchmaking queue
+  app.post('/api/v1/admin/games/:id/terminate', async (req, reply) => {
+    if (!verifyAdmin(req, reply)) return;
+
+    const { id } = req.params as { id: string };
+
+    // 1. Try terminating in Game-Server
+    let terminatedInGs = false;
+    try {
+      const gsRes = await fetch(`http://127.0.0.1:4001/internal/rooms/${encodeURIComponent(id)}/terminate`, {
+        method: 'POST',
+      });
+      if (gsRes.ok) terminatedInGs = true;
+    } catch {}
+
+    // 2. Try cancelling challenge
+    const cancelledChallenge = cancelChallenge(id);
+
+    // 3. Try cancelling matchmaking
+    const cancelledMm = cancelMatchmakingForUser(id);
+
+    return reply.send({
+      success: true,
+      message: `Item ${id} ended forcefully.`,
+      details: {
+        gameRoomTerminated: terminatedInGs,
+        challengeCancelled: cancelledChallenge,
+        matchmakingCancelled: cancelledMm,
+      },
+    });
+  });
+
+  // Admin: Paginated users directory
+  app.get('/api/v1/admin/users', async (req, reply) => {
+    if (!verifyAdmin(req, reply)) return;
+
+    const { page = '1', limit = '10', search = '' } = req.query as { page?: string; limit?: string; search?: string };
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const term = search.trim().toLowerCase();
+
+    let allUsers = (await repo.getAllUsers?.()) || [];
+    if (term) {
+      allUsers = allUsers.filter((u) => u.username.toLowerCase().includes(term));
+    }
+
+    const total = allUsers.length;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+    const start = (pageNum - 1) * limitNum;
+    const paginated = allUsers.slice(start, start + limitNum);
+
+    const usersData = await Promise.all(
+      paginated.map(async (u) => {
+        const ratings = (await repo.getUserRatings(u.id)) || [];
+        const games = repo.getUserGames ? (await repo.getUserGames(u.id)) || [] : [];
+        return {
+          id: u.id,
+          username: u.username,
+          avatarUrl: u.avatarUrl || '',
+          bio: u.bio || '',
+          views: u.views || 0,
+          createdAt: u.createdAt,
+          lastSeenAt: u.lastSeenAt || u.createdAt,
+          isOnline: activePresenceSessions.has(u.id),
+          gamesCount: games.length,
+          ratings: {
+            fideBlitz: ratings.find((r) => r.system === 'fide' && r.category === 'blitz')?.rating || 200,
+            fideRapid: ratings.find((r) => r.system === 'fide' && r.category === 'rapid')?.rating || 200,
+            fideBullet: ratings.find((r) => r.system === 'fide' && r.category === 'bullet')?.rating || 200,
+          },
+        };
+      })
+    );
+
+    return reply.send({
+      users: usersData,
+      total,
+      page: pageNum,
+      totalPages,
+      limit: limitNum,
+    });
+  });
+
+  // Admin: Paginated game history
+  app.get('/api/v1/admin/history', async (req, reply) => {
+    if (!verifyAdmin(req, reply)) return;
+
+    const { page = '1', limit = '10' } = req.query as { page?: string; limit?: string };
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    const completedGames: any[] = repo.getUserGames ? (repo as any).games || [] : [];
+    const total = completedGames.length;
+    const totalPages = Math.ceil(total / limitNum) || 1;
+    const start = (pageNum - 1) * limitNum;
+    const paginated = [...completedGames].reverse().slice(start, start + limitNum);
+
+    return reply.send({
+      games: paginated,
+      total,
+      page: pageNum,
+      totalPages,
+      limit: limitNum,
+    });
+  });
 
   app.register(challengesRoutes);
   app.register(matchmakingRoutes);

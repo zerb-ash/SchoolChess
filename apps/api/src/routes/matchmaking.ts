@@ -169,3 +169,21 @@ export async function matchmakingRoutes(app: FastifyInstance) {
   });
 }
 
+export function getAllMatchmakingPlayers(): QueuedPlayer[] {
+  return Array.from(playerLookup.values());
+}
+
+export function cancelMatchmakingForUser(userId: string): boolean {
+  const player = playerLookup.get(userId);
+  if (player) {
+    const pool = queues.get(player.timeControl) || [];
+    queues.set(
+      player.timeControl,
+      pool.filter((p) => p.userId !== userId)
+    );
+    playerLookup.delete(userId);
+    return true;
+  }
+  return false;
+}
+

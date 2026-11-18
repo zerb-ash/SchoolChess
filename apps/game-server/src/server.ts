@@ -22,6 +22,21 @@ export function buildGameServer() {
     return { status: 'ok', activeRooms: roomManager.getActiveCount(), uptime: process.uptime() };
   });
 
+  app.get('/internal/rooms', async () => {
+    return { rooms: roomManager.getAllRooms() };
+  });
+
+  app.post('/internal/rooms/:gameId/terminate', async (req, reply) => {
+    const { gameId } = req.params as { gameId: string };
+    const room = roomManager.getRoom(gameId);
+    if (!room) {
+      return reply.code(404).send({ error: 'ROOM_NOT_FOUND', message: 'Room not found or already ended' });
+    }
+    room.forceTerminate();
+    roomManager.removeRoom(gameId);
+    return reply.send({ success: true, message: `Game ${gameId} terminated successfully.` });
+  });
+
   const handleWs = (socket: WebSocket, req: any) => {
     let activeGameId: string | null = null;
     const parsedUrl = new URL(req.url || '', 'http://localhost');

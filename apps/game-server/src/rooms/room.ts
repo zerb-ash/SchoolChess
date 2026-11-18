@@ -422,6 +422,20 @@ export class GameRoom {
     }
   }
 
+  public forceTerminate(reason: string = 'Game terminated by administrator.'): void {
+    this.broadcast({
+      type: 'game:over',
+      payload: {
+        gameId: this.gameId,
+        result: '1/2-1/2',
+        termination: 'aborted',
+        message: reason,
+      },
+    });
+    this.status = 'aborted';
+    this.destroy();
+  }
+
   public destroy(): void {
     if (this.emptyRoomTimeout) {
       clearTimeout(this.emptyRoomTimeout);

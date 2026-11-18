@@ -36,6 +36,14 @@ export class RoomManager {
   public getActiveCount(): number {
     return this.rooms.size;
   }
+
+  public getAllRooms(): Array<ReturnType<GameRoom['getStatePayload']>> {
+    const list: Array<ReturnType<GameRoom['getStatePayload']>> = [];
+    for (const room of this.rooms.values()) {
+      list.push(room.getStatePayload());
+    }
+    return list;
+  }
 }
 
 export const roomManager = new RoomManager();

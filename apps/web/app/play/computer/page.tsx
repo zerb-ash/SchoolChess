@@ -211,9 +211,9 @@ export default function PlayComputerPage() {
   const bottomElo = isBottomPlayer ? 'Player' : `Elo: ${currentBot.elo}`;
 
   return (
-    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 py-6 px-4">
+    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 sm:gap-6 py-3 sm:py-6 px-2 sm:px-4">
       {/* Left Column: Bot Difficulty Picker */}
-      <div className="w-full lg:w-72 flex flex-col gap-4 order-2 lg:order-1">
+      <div className="w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px] lg:max-w-none lg:w-72 flex flex-col gap-4 order-2 lg:order-1">
         <div className="bg-wood-900 border border-wood-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
           <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
             <Bot className="w-4 h-4 text-brass-400" />
@@ -255,9 +255,9 @@ export default function PlayComputerPage() {
       </div>
 
       {/* Middle Column: Board & Eval Bar */}
-      <div className="flex flex-col items-center w-full max-w-[620px] order-1 lg:order-2">
+      <div className="flex flex-col items-center w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px] order-1 lg:order-2">
         {/* Top Header */}
-        <div className="w-full flex items-center justify-between mb-2 px-1">
+        <div className="w-full flex items-center justify-between mb-1.5 sm:mb-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
@@ -283,8 +283,8 @@ export default function PlayComputerPage() {
         </div>
 
         {/* Board with Eval Bar */}
-        <div className="w-full flex gap-3 items-stretch">
-          <div className="h-[340px] sm:h-[500px] md:h-[560px]">
+        <div className="w-full flex gap-2 sm:gap-3 items-stretch justify-center">
+          <div className="w-6 sm:w-8 md:w-10 shrink-0 flex flex-col">
             <EvaluationBar
               score={evalResult.score}
               text={evalResult.text}
@@ -293,7 +293,7 @@ export default function PlayComputerPage() {
             />
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <Chessboard
               fen={fen}
               orientation={orientation}

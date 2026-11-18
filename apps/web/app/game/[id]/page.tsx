@@ -10,6 +10,7 @@ import { soundSystem } from '../../../lib/audio';
 import { getWsBaseUrl } from '../../../lib/config';
 import { TabSocketManager } from '@schoolchess/tab-sync';
 import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, AlertTriangle } from 'lucide-react';
+import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
 
 function LiveGameContent() {
   const params = useParams();
@@ -512,8 +513,8 @@ function LiveGameContent() {
   const isMyTurn = myColor !== null && myColor === turn;
 
   return (
-    <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 py-6 px-4">
-      <div className="flex flex-col items-center w-full max-w-[620px]">
+    <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-4 sm:gap-6 lg:gap-8 py-3 sm:py-6 px-2 sm:px-4">
+      <div className="flex flex-col items-center w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px]">
         {opponentReconnectSec !== null && !isGameOver && (
           <div className="w-full mb-3 p-3 rounded-xl bg-amber-950/80 border border-amber-600/50 text-amber-200 text-xs flex items-center justify-between shadow-lg animate-pulse">
             <span className="font-semibold">Opponent disconnected. Awaiting reconnection...</span>
@@ -522,15 +523,16 @@ function LiveGameContent() {
         )}
 
         {/* Top Player (Opponent) */}
-        <div className="w-full flex items-center justify-between mb-2 px-1">
+        <div className="w-full flex items-center justify-between mb-1.5 sm:mb-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
                 topColor === 'black' ? 'bg-wood-950 border border-brass-500/40' : 'bg-parchment-100 shadow'
               }`}
             />
-            <span className="text-xs font-serif font-bold text-parchment-300">
-              {topPlayerLabel}
+            <span className="text-xs font-serif font-bold text-parchment-300 flex items-center gap-1">
+              <span>{topPlayerLabel}</span>
+              {isOwner(topPlayer?.username) && <OwnerBadge size="xs" />}
             </span>
             {turn === (topColor === 'white' ? 'w' : 'b') && !isGameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
@@ -564,15 +566,16 @@ function LiveGameContent() {
         />
 
         {/* Bottom Player (You) */}
-        <div className="w-full flex items-center justify-between mt-2 px-1">
+        <div className="w-full flex items-center justify-between mt-1.5 sm:mt-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
                 bottomColor === 'white' ? 'bg-parchment-100 shadow' : 'bg-wood-950 border border-brass-500/40'
               }`}
             />
-            <span className="text-xs font-serif font-bold text-parchment-100">
-              {bottomPlayerLabel}
+            <span className="text-xs font-serif font-bold text-parchment-100 flex items-center gap-1">
+              <span>{bottomPlayerLabel}</span>
+              {(isOwner(bottomPlayer?.username) || (isBottomMe && isOwner(user?.username))) && <OwnerBadge size="xs" />}
             </span>
             {isMyTurn && !isGameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
@@ -637,7 +640,7 @@ function LiveGameContent() {
       </div>
 
       {/* Right Column: Move History & In-game controls */}
-      <div className="w-full lg:w-80 flex flex-col gap-4">
+      <div className="w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px] lg:max-w-none lg:w-80 flex flex-col gap-4">
         <div className="bg-wood-900 border border-wood-800 rounded-xl p-3 shadow-md flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <div

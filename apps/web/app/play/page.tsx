@@ -265,7 +265,7 @@ export default function PlayPage() {
             <h2 className="text-xs uppercase tracking-wider text-parchment-400 font-bold">
               Time Controls
             </h2>
-            <div className="flex items-center gap-1 bg-wood-900 p-1 rounded-xl border border-wood-800">
+            <div className="flex items-center gap-1 bg-wood-900 p-1 rounded-xl border border-wood-800 overflow-x-auto no-scrollbar max-w-full">
               {categories.map((cat) => (
                 <button
                   key={cat.id}

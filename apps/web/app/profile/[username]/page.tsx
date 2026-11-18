@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { MiniBoard } from '../../../components/board/MiniBoard';
 import { BulletIcon, BlitzIcon, RapidIcon, ClassicalIcon } from '../../../components/icons/ChessModeIcons';
+import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
 
 interface UserProfileData {
   id: string;
@@ -282,6 +283,7 @@ export default function UserProfilePage() {
               <h1 className="text-xl sm:text-2xl font-bold font-serif text-parchment-100 tracking-wide">
                 {profile.username}
               </h1>
+              {isOwner(profile.username) && <OwnerBadge size="md" />}
             </div>
 
             {isOwnProfile && (

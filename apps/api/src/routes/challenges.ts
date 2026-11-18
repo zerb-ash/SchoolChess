@@ -198,3 +198,18 @@ export async function challengesRoutes(app: FastifyInstance) {
     return reply.send({ token, challenge });
   });
 }
+
+export function getAllActiveChallenges(): ChallengeData[] {
+  return Array.from(activeChallenges.values());
+}
+
+export function cancelChallenge(idOrToken: string): boolean {
+  for (const [token, c] of activeChallenges.entries()) {
+    if (c.id === idOrToken || c.token === idOrToken || c.gameId === idOrToken) {
+      activeChallenges.delete(token);
+      shortCodeMap.delete(c.shortCode);
+      return true;
+    }
+  }
+  return false;
+}
