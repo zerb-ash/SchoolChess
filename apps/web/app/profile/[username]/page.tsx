@@ -109,7 +109,9 @@ function getSpeedBadge(timeControl: string, category?: string) {
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiBaseUrl } from '../../../lib/config';
+
+const API_BASE = getApiBaseUrl();
 
 function formatRelativeTime(dateStr: string): string {
   const diffMs = Date.now() - new Date(dateStr).getTime();

@@ -3,7 +3,9 @@
 import { useEffect } from 'react';
 import { useAuth } from './useAuth';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiBaseUrl } from './config';
+
+const API_BASE = getApiBaseUrl();
 
 export function usePresence() {
   const { user } = useAuth();

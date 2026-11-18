@@ -47,18 +47,31 @@ class ChessSoundSystem {
     await Promise.all(sounds.map((name) => this.loadBuffer(`/sounds/${name}.mp3`)));
   }
 
+  private getDecodingContext(): BaseAudioContext | null {
+    if (this.ctx) return this.ctx;
+    if (typeof window === 'undefined') return null;
+    const OfflineCtx = (window as any).OfflineAudioContext || (window as any).webkitOfflineAudioContext;
+    if (OfflineCtx) {
+      try {
+        return new OfflineCtx(1, 1, 44100);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   private async loadBuffer(url: string): Promise<AudioBuffer | null> {
     if (this.bufferCache.has(url)) {
       return this.bufferCache.get(url)!;
     }
 
-    const ctx = this.ensureContext();
-    if (!ctx) return null;
-
     try {
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const decodeCtx = this.ctx || this.getDecodingContext();
+      if (!decodeCtx) return null;
+      const audioBuffer = await decodeCtx.decodeAudioData(arrayBuffer);
       this.bufferCache.set(url, audioBuffer);
       return audioBuffer;
     } catch {

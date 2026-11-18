@@ -15,7 +15,9 @@ export interface AuthUser {
   };
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiBaseUrl } from './config';
+
+const API_BASE = getApiBaseUrl();
 const LOCAL_STORAGE_USER_KEY = 'schoolchess_authenticated_user_v1';
 
 export function useAuth() {

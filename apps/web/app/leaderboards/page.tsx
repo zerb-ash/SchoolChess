@@ -13,7 +13,9 @@ interface LeaderboardEntry {
   winRate: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiBaseUrl } from '../../lib/config';
+
+const API_BASE = getApiBaseUrl();
 
 export default function LeaderboardsPage() {
   const [activeTab, setActiveTab] = useState<'fide' | 'chess_com' | 'lichess'>('fide');

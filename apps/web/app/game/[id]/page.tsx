@@ -7,6 +7,7 @@ import { Chessboard } from '../../../components/board/Chessboard';
 import { useAppSettings } from '../../../lib/useSettings';
 import { useAuth } from '../../../lib/useAuth';
 import { soundSystem } from '../../../lib/audio';
+import { getWsBaseUrl } from '../../../lib/config';
 import { TabSocketManager } from '@schoolchess/tab-sync';
 import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, AlertTriangle } from 'lucide-react';
 
@@ -72,7 +73,7 @@ function LiveGameContent() {
   useEffect(() => {
     if (authLoading) return;
 
-    const baseWsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
+    const baseWsUrl = getWsBaseUrl();
     const wsUrl = `${baseWsUrl}?userId=${encodeURIComponent(effectiveUserId)}&username=${encodeURIComponent(effectiveUsername)}`;
 
     const manager = new TabSocketManager({

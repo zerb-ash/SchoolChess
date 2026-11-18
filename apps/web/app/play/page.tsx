@@ -18,7 +18,9 @@ import { BulletIcon, BlitzIcon, RapidIcon, ClassicalIcon } from '../../component
 import { useAuth } from '../../lib/useAuth';
 import { AuthModal } from '../../components/auth/AuthModal';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
+import { getApiBaseUrl } from '../../lib/config';
+
+const API_BASE = getApiBaseUrl();
 
 type CategoryFilter = 'all' | 'bullet' | 'blitz' | 'rapid' | 'classical';
 
