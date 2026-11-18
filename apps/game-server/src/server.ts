@@ -220,9 +220,12 @@ export function buildGameServer() {
   return app;
 }
 
-const isMainModule = process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href;
+const isMainModule =
+  process.env.pm_id !== undefined ||
+  process.env.START_SERVER === 'true' ||
+  Boolean(process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href);
 
-if (isMainModule || process.env.START_SERVER === 'true') {
+if (isMainModule) {
   const app = buildGameServer();
   const port = parseInt(process.env.PORT || '4001', 10);
   app.listen({ port, host: '0.0.0.0' }, (err, address) => {

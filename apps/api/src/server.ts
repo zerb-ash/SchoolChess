@@ -413,9 +413,12 @@ export function buildServer(userRepo?: IUserRepository) {
   return app;
 }
 
-const isMainModule = process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href;
+const isMainModule =
+  process.env.pm_id !== undefined ||
+  process.env.START_SERVER === 'true' ||
+  Boolean(process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href);
 
-if (isMainModule || process.env.START_SERVER === 'true') {
+if (isMainModule) {
   const app = buildServer();
   const port = parseInt(process.env.PORT || '4000', 10);
   app.listen({ port, host: '0.0.0.0' }, (err, address) => {
