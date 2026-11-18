@@ -8,3 +8,4 @@ export function getWsBaseUrl(): string {
   const raw = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4001/ws/game';
   return raw.replace(/\/+$/, '');
 }
+

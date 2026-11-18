@@ -18,7 +18,8 @@ export interface AuthUser {
 import { getApiBaseUrl } from './config';
 
 const API_BASE = getApiBaseUrl();
-const LOCAL_STORAGE_USER_KEY = 'schoolchess_authenticated_user_v1';
+export const LOCAL_STORAGE_USER_KEY = 'schoolchess_authenticated_user_v1';
+export const LOCAL_STORAGE_TOKEN_KEY = 'schoolchess_session_token_v1';
 
 export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -27,7 +28,13 @@ export function useAuth() {
 
   const refreshUser = useCallback(async () => {
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       const res = await fetch(`${API_BASE}/api/v1/auth/me`, {
+        headers,
         credentials: 'include',
       });
       if (res.ok) {
@@ -58,12 +65,32 @@ export function useAuth() {
             window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: fullUser }));
           }
         } else {
-          setUser(null);
-          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+          if (token) {
+            localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+            localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+            setUser(null);
+          } else {
+            const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+            if (stored) {
+              try {
+                setUser(JSON.parse(stored));
+              } catch {
+                setUser(null);
+              }
+            } else {
+              setUser(null);
+            }
+          }
         }
       } else {
-        setUser(null);
-        localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+        const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+        if (stored) {
+          try {
+            setUser(JSON.parse(stored));
+          } catch {
+            setUser(null);
+          }
+        }
       }
     } catch {
       const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
@@ -128,6 +155,9 @@ export function useAuth() {
       }
 
       const data = await res.json();
+      if (data.token) {
+        localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, data.token);
+      }
       const newUser: AuthUser = {
         id: data.id,
         username: data.username,
@@ -184,6 +214,9 @@ export function useAuth() {
       }
 
       const data = await res.json();
+      if (data.token) {
+        localStorage.setItem(LOCAL_STORAGE_TOKEN_KEY, data.token);
+      }
       const loggedUser: AuthUser = {
         id: data.id,
         username: data.username,
@@ -225,8 +258,14 @@ export function useAuth() {
 
   const logout = async () => {
     try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY) : null;
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       await fetch(`${API_BASE}/api/v1/auth/logout`, {
         method: 'POST',
+        headers,
         credentials: 'include',
       });
     } catch {
@@ -234,6 +273,7 @@ export function useAuth() {
     }
     setUser(null);
     localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: null }));
     }

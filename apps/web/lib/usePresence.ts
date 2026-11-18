@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useAuth } from './useAuth';
+import { useAuth, LOCAL_STORAGE_TOKEN_KEY } from './useAuth';
 
 import { getApiBaseUrl } from './config';
 
@@ -18,7 +18,12 @@ export function usePresence() {
 
     const startTunnel = () => {
       try {
-        eventSource = new EventSource(`${API_BASE}/api/v1/presence/tunnel`, {
+        const token = localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY);
+        const url = new URL(`${API_BASE}/api/v1/presence/tunnel`);
+        if (token) {
+          url.searchParams.set('token', token);
+        }
+        eventSource = new EventSource(url.toString(), {
           withCredentials: true,
         });
 

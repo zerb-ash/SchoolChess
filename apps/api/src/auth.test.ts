@@ -4,7 +4,7 @@ import { buildServer } from './server.js';
 import { InMemoryUserRepository } from './auth/user-repository.js';
 
 test('Auth API - User Registration with ratings seeding', async () => {
-  const repo = new InMemoryUserRepository();
+  const repo = new InMemoryUserRepository(':memory:');
   const app = buildServer(repo);
 
   const res = await app.inject({
@@ -20,13 +20,14 @@ test('Auth API - User Registration with ratings seeding', async () => {
   const data = JSON.parse(res.body);
   assert.equal(data.username, 'magnus_carlsen'); // normalized to lowercase
   assert.ok(data.id);
+  assert.ok(data.token);
 
   // Assert session cookie set
   const cookies = res.cookies;
   const sessionCookie = cookies.find((c) => c.name === 'schoolchess_session');
   assert.ok(sessionCookie);
   assert.equal(sessionCookie.httpOnly, true);
-  assert.equal(sessionCookie.sameSite, 'Lax');
+  assert.equal(sessionCookie.sameSite, 'None');
 
   // Assert ratings were seeded for all 3 systems
   const ratings = await repo.getUserRatings(data.id);
@@ -37,7 +38,7 @@ test('Auth API - User Registration with ratings seeding', async () => {
 });
 
 test('Auth API - Rejects invalid username formatting', async () => {
-  const repo = new InMemoryUserRepository();
+  const repo = new InMemoryUserRepository(':memory:');
   const app = buildServer(repo);
 
   const res = await app.inject({
@@ -55,7 +56,7 @@ test('Auth API - Rejects invalid username formatting', async () => {
 });
 
 test('Auth API - Rejects password longer than 72 bytes (DoS protection)', async () => {
-  const repo = new InMemoryUserRepository();
+  const repo = new InMemoryUserRepository(':memory:');
   const app = buildServer(repo);
 
   const res = await app.inject({
@@ -71,7 +72,7 @@ test('Auth API - Rejects password longer than 72 bytes (DoS protection)', async 
 });
 
 test('Auth API - Enforces 16KB hard body limit', async () => {
-  const repo = new InMemoryUserRepository();
+  const repo = new InMemoryUserRepository(':memory:');
   const app = buildServer(repo);
 
   // Create a payload larger than 16KB (16384 bytes)
@@ -92,7 +93,7 @@ test('Auth API - Enforces 16KB hard body limit', async () => {
 });
 
 test('Auth API - Login, /me, and Logout lifecycle', async () => {
-  const repo = new InMemoryUserRepository();
+  const repo = new InMemoryUserRepository(':memory:');
   const app = buildServer(repo);
 
   // 1. Register

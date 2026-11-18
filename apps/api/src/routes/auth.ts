@@ -7,6 +7,22 @@ import { IUserRepository } from '../auth/user-repository.js';
 export const COOKIE_NAME = 'schoolchess_session';
 export const COOKIE_MAX_AGE_SEC = 14 * 24 * 60 * 60;
 
+export function extractToken(request: FastifyRequest): string | null {
+  const authHeader = request.headers.authorization;
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) {
+    return authHeader.substring(7).trim();
+  }
+  const queryToken = (request.query as any)?.token;
+  if (typeof queryToken === 'string' && queryToken.trim()) {
+    return queryToken.trim();
+  }
+  const cookieToken = request.cookies?.[COOKIE_NAME];
+  if (cookieToken) {
+    return cookieToken;
+  }
+  return null;
+}
+
 export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserRepository) {
   app.post('/register', async (request: FastifyRequest, reply: FastifyReply) => {
     const parseResult = RegisterRequestSchema.safeParse(request.body);
@@ -44,6 +60,7 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       id: user.id,
       username: user.username,
       createdAt: user.createdAt,
+      token,
     });
   });
 
@@ -92,11 +109,12 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       createdAt: user.createdAt,
       bio: user.bio || 'No bio',
       avatarUrl: user.avatarUrl || '',
+      token,
     });
   });
 
   app.post('/logout', async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies[COOKIE_NAME];
+    const token = extractToken(request);
     if (token) {
       sessionStore.revokeSession(token);
     }
@@ -111,7 +129,7 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
   });
 
   app.get('/me', async (request: FastifyRequest, reply: FastifyReply) => {
-    const token = request.cookies[COOKIE_NAME];
+    const token = extractToken(request);
     if (!token) {
       return reply.status(200).send({ user: null });
     }

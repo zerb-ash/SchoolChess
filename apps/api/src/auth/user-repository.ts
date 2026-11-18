@@ -167,6 +167,7 @@ export class InMemoryUserRepository implements IUserRepository {
   }
 
   private loadFromDisk(): void {
+    if (this.dataFilePath === ':memory:') return;
     try {
       if (fs.existsSync(this.dataFilePath)) {
         const raw = fs.readFileSync(this.dataFilePath, 'utf8');
@@ -198,6 +199,7 @@ export class InMemoryUserRepository implements IUserRepository {
   }
 
   private saveToDisk(): void {
+    if (this.dataFilePath === ':memory:') return;
     try {
       const dir = path.dirname(this.dataFilePath);
       if (!fs.existsSync(dir)) {

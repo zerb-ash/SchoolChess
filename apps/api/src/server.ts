@@ -2,7 +2,7 @@ import fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import cors from '@fastify/cors';
 import url from 'node:url';
-import { registerAuthRoutes, COOKIE_NAME } from './routes/auth.js';
+import { registerAuthRoutes, COOKIE_NAME, extractToken } from './routes/auth.js';
 import { challengesRoutes } from './routes/challenges.js';
 import { matchmakingRoutes } from './routes/matchmaking.js';
 import { sessionStore } from './auth/session.js';
@@ -241,7 +241,7 @@ export function buildServer(userRepo?: IUserRepository) {
   const activePresenceSessions = new Map<string, number>();
 
   app.get('/api/v1/presence/tunnel', async (req, reply) => {
-    const token = (req.cookies as any)?.[COOKIE_NAME];
+    const token = extractToken(req);
     if (!token) {
       return reply.code(401).send({ message: 'Unauthorized' });
     }
@@ -376,7 +376,7 @@ export function buildServer(userRepo?: IUserRepository) {
       return reply.code(404).send({ message: 'User not found' });
     }
 
-    const token = (req.cookies as any)?.[COOKIE_NAME];
+    const token = extractToken(req);
     const session = token ? sessionStore.getSession(token) : null;
     if (session && session.userId === user.id) {
       return reply.send({ views: user.views || 0, skipped: true });
