@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { eq, sql } from 'drizzle-orm';
 import { DatabaseInstance, users, userRatings, userStatistics, userSettings } from '@schoolchess/database';
 
@@ -17,6 +19,9 @@ export interface UserRatingSummary {
   category: string;
   rating: number;
   provisional: boolean;
+  rd?: number;
+  volatility?: number;
+  gamesCount?: number;
 }
 
 export interface CompletedGameRecord {
@@ -26,14 +31,17 @@ export interface CompletedGameRecord {
   whiteUserId: string;
   whiteUsername: string;
   whiteRating: number;
+  whiteAvatarUrl?: string;
   blackUserId: string;
   blackUsername: string;
   blackRating: number;
+  blackAvatarUrl?: string;
   result: '1-0' | '0-1' | '1/2-1/2';
   termination: string;
   movesCount: number;
   accuracyWhite?: number;
   accuracyBlack?: number;
+  finalFen?: string;
   playedAt: Date;
 }
 
@@ -42,11 +50,20 @@ export interface IUserRepository {
   findById(id: string): Promise<UserRecord | null>;
   createUser(username: string, passwordHash: string): Promise<UserRecord>;
   getUserRatings(userId: string): Promise<UserRatingSummary[]>;
+  updateUserRating?(
+    userId: string,
+    system: string,
+    category: string,
+    newRating: number,
+    newRd?: number,
+    newVolatility?: number
+  ): Promise<void>;
   getAllUsers?(): Promise<UserRecord[]>;
   updateProfile?(userId: string, data: { bio?: string; avatarUrl?: string }): Promise<UserRecord | null>;
   incrementViews?(userId: string): Promise<number>;
   recordGame?(game: CompletedGameRecord): Promise<void>;
   getUserGames?(userId: string): Promise<CompletedGameRecord[]>;
+  updateLastSeen?(userId: string, date: Date): Promise<void>;
 }
 
 export class PostgresUserRepository implements IUserRepository {
@@ -139,6 +156,63 @@ export class InMemoryUserRepository implements IUserRepository {
   private users = new Map<string, UserRecord>();
   private ratings = new Map<string, UserRatingSummary[]>();
   private games: CompletedGameRecord[] = [];
+  private dataFilePath: string;
+
+  constructor(filePath?: string) {
+    this.dataFilePath =
+      filePath ||
+      process.env.DATA_FILE_PATH ||
+      path.resolve(process.cwd(), 'data', 'schoolchess_db.json');
+    this.loadFromDisk();
+  }
+
+  private loadFromDisk(): void {
+    try {
+      if (fs.existsSync(this.dataFilePath)) {
+        const raw = fs.readFileSync(this.dataFilePath, 'utf8');
+        const data = JSON.parse(raw);
+        if (data.users && Array.isArray(data.users)) {
+          for (const u of data.users) {
+            this.users.set(u.id, {
+              ...u,
+              createdAt: new Date(u.createdAt),
+              lastSeenAt: u.lastSeenAt ? new Date(u.lastSeenAt) : new Date(u.createdAt),
+            });
+          }
+        }
+        if (data.ratings && typeof data.ratings === 'object') {
+          for (const [userId, list] of Object.entries(data.ratings)) {
+            this.ratings.set(userId, list as UserRatingSummary[]);
+          }
+        }
+        if (data.games && Array.isArray(data.games)) {
+          this.games = data.games.map((g: any) => ({
+            ...g,
+            playedAt: g.playedAt ? new Date(g.playedAt) : new Date(),
+          }));
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load in-memory storage from disk:', e);
+    }
+  }
+
+  private saveToDisk(): void {
+    try {
+      const dir = path.dirname(this.dataFilePath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const data = {
+        users: Array.from(this.users.values()),
+        ratings: Object.fromEntries(this.ratings.entries()),
+        games: this.games,
+      };
+      fs.writeFileSync(this.dataFilePath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (e) {
+      console.warn('Failed to save in-memory storage to disk:', e);
+    }
+  }
 
   async findByUsername(username: string): Promise<UserRecord | null> {
     const target = username.toLowerCase();
@@ -164,7 +238,7 @@ export class InMemoryUserRepository implements IUserRepository {
       username,
       passwordHash,
       createdAt: new Date(),
-      bio: '',
+      bio: 'No bio',
       avatarUrl: '',
       views: 0,
       lastSeenAt: new Date(),
@@ -183,16 +257,51 @@ export class InMemoryUserRepository implements IUserRepository {
           category: cat,
           rating: 200,
           provisional: true,
+          rd: sys === 'fide' ? undefined : 350,
+          volatility: sys === 'lichess' ? 0.06 : undefined,
+          gamesCount: 0,
         });
       }
     }
 
     this.ratings.set(id, userRatingList);
+    this.saveToDisk();
     return record;
   }
 
   async getUserRatings(userId: string): Promise<UserRatingSummary[]> {
     return this.ratings.get(userId) ?? [];
+  }
+
+  async updateUserRating(
+    userId: string,
+    system: string,
+    category: string,
+    newRating: number,
+    newRd?: number,
+    newVolatility?: number
+  ): Promise<void> {
+    const list = this.ratings.get(userId);
+    if (!list) return;
+    const entry = list.find((r) => r.system === system && r.category === category);
+    if (entry) {
+      entry.rating = Math.max(100, Math.round(newRating));
+      if (newRd !== undefined) entry.rd = newRd;
+      if (newVolatility !== undefined) entry.volatility = newVolatility;
+      entry.gamesCount = (entry.gamesCount || 0) + 1;
+      entry.provisional = (entry.gamesCount || 0) < 10;
+    } else {
+      list.push({
+        system,
+        category,
+        rating: Math.max(100, Math.round(newRating)),
+        provisional: false,
+        rd: newRd,
+        volatility: newVolatility,
+        gamesCount: 1,
+      });
+    }
+    this.saveToDisk();
   }
 
   async getAllUsers(): Promise<UserRecord[]> {
@@ -205,6 +314,7 @@ export class InMemoryUserRepository implements IUserRepository {
     if (data.bio !== undefined) user.bio = data.bio;
     if (data.avatarUrl !== undefined) user.avatarUrl = data.avatarUrl;
     user.lastSeenAt = new Date();
+    this.saveToDisk();
     return user;
   }
 
@@ -212,17 +322,32 @@ export class InMemoryUserRepository implements IUserRepository {
     const user = this.users.get(userId);
     if (!user) return 0;
     user.views = (user.views || 0) + 1;
+    this.saveToDisk();
     return user.views;
   }
 
   async recordGame(game: CompletedGameRecord): Promise<void> {
-    this.games.unshift(game);
+    const idx = this.games.findIndex((g) => g.id === game.id);
+    if (idx >= 0) {
+      this.games[idx] = game;
+    } else {
+      this.games.unshift(game);
+    }
+    this.saveToDisk();
   }
 
   async getUserGames(userId: string): Promise<CompletedGameRecord[]> {
     return this.games.filter(
       (g) => g.whiteUserId === userId || g.blackUserId === userId
     );
+  }
+
+  async updateLastSeen(userId: string, date: Date): Promise<void> {
+    const user = this.users.get(userId);
+    if (user) {
+      user.lastSeenAt = date;
+      this.saveToDisk();
+    }
   }
 }
 
@@ -284,6 +409,17 @@ export class ResilientUserRepository implements IUserRepository {
     }
   }
 
+  async updateUserRating(
+    userId: string,
+    system: string,
+    category: string,
+    newRating: number,
+    newRd?: number,
+    newVolatility?: number
+  ): Promise<void> {
+    return this.inMemory.updateUserRating(userId, system, category, newRating, newRd, newVolatility);
+  }
+
   async getAllUsers(): Promise<UserRecord[]> {
     return this.inMemory.getAllUsers();
   }
@@ -302,6 +438,10 @@ export class ResilientUserRepository implements IUserRepository {
 
   async getUserGames(userId: string): Promise<CompletedGameRecord[]> {
     return this.inMemory.getUserGames(userId);
+  }
+
+  async updateLastSeen(userId: string, date: Date): Promise<void> {
+    return this.inMemory.updateLastSeen(userId, date);
   }
 }
 

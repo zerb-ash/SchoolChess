@@ -23,28 +23,32 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
     // Sigmoid compression for smooth visual bar height
     const cpClamped = Math.max(-1500, Math.min(1500, score));
     whitePercent = 50 + (cpClamped / 1500) * 45;
-    whitePercent = Math.max(5, Math.min(95, whitePercent));
+    whitePercent = Math.max(8, Math.min(92, whitePercent));
   }
 
   // Adjust display percentage if board is flipped
   const fillPercent = orientation === 'white' ? whitePercent : 100 - whitePercent;
 
   return (
-    <div className="relative w-6 sm:w-8 h-full rounded-lg overflow-hidden border border-wood-700 bg-wood-950 flex flex-col justify-end shadow-inner">
+    <div className="relative w-8 sm:w-10 h-full rounded-xl overflow-hidden border border-wood-700/80 bg-wood-950 flex flex-col justify-end shadow-inner select-none">
       {/* Black's share (top) is the dark wood background */}
       {/* White's share (bottom) is the ivory parchment fill */}
       <div
-        className="w-full bg-parchment-200 transition-all duration-300 ease-out flex items-center justify-center"
+        className="w-full bg-parchment-200 transition-all duration-300 ease-out"
         style={{ height: `${fillPercent}%` }}
       />
 
-      {/* Floating Score Badge */}
-      <div className="absolute inset-x-0 bottom-2 flex justify-center pointer-events-none">
+      {/* Score Text displayed directly inside the majority section */}
+      <div
+        className={`absolute inset-x-0 flex items-center justify-center pointer-events-none px-0.5 ${
+          fillPercent >= 50 ? 'bottom-2' : 'top-2'
+        }`}
+      >
         <span
-          className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded shadow ${
-            score >= 0
-              ? 'bg-wood-900/90 text-parchment-100 border border-wood-700'
-              : 'bg-parchment-100/90 text-wood-950 border border-parchment-300'
+          className={`w-full text-center text-[10px] sm:text-[11px] font-mono font-bold tracking-tighter whitespace-nowrap overflow-hidden ${
+            fillPercent >= 50
+              ? 'text-wood-950'
+              : 'text-parchment-100'
           }`}
         >
           {text}
@@ -53,4 +57,3 @@ export const EvaluationBar: React.FC<EvaluationBarProps> = ({
     </div>
   );
 };
-

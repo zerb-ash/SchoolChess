@@ -4,8 +4,8 @@ import { hashPassword, verifyPassword, runDummyHashVerification } from '../auth/
 import { sessionStore } from '../auth/session.js';
 import { IUserRepository } from '../auth/user-repository.js';
 
-const COOKIE_NAME = 'schoolchess_session';
-const COOKIE_MAX_AGE_SEC = 14 * 24 * 60 * 60;
+export const COOKIE_NAME = 'schoolchess_session';
+export const COOKIE_MAX_AGE_SEC = 14 * 24 * 60 * 60;
 
 export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserRepository) {
   app.post('/register', async (request: FastifyRequest, reply: FastifyReply) => {
@@ -32,10 +32,11 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
 
     const token = sessionStore.createSession(user.id, user.username);
 
+    const isHttps = request.protocol === 'https' || request.headers['x-forwarded-proto'] === 'https';
     reply.setCookie(COOKIE_NAME, token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE_SEC,
     });
@@ -78,10 +79,11 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
 
     const token = sessionStore.createSession(user.id, user.username);
 
+    const isHttps = request.protocol === 'https' || request.headers['x-forwarded-proto'] === 'https';
     reply.setCookie(COOKIE_NAME, token, {
       path: '/',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: isHttps,
       sameSite: 'lax',
       maxAge: COOKIE_MAX_AGE_SEC,
     });
@@ -90,6 +92,8 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       id: user.id,
       username: user.username,
       createdAt: user.createdAt,
+      bio: user.bio || 'No bio',
+      avatarUrl: user.avatarUrl || '',
     });
   });
 
@@ -129,6 +133,8 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
         id: user.id,
         username: user.username,
         createdAt: user.createdAt,
+        bio: user.bio || 'No bio',
+        avatarUrl: user.avatarUrl || '',
         ratings: { fide, chesscom, lichess },
       },
     });

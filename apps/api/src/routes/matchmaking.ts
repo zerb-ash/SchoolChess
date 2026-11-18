@@ -60,7 +60,7 @@ function processPairing(timeControl: string): void {
 const JoinQueueSchema = z.object({
   userId: z.string(),
   username: z.string().min(1).max(30),
-  timeControl: z.enum(['1+0', '3+0', '5+0', '10+0']).default('5+0'),
+  timeControl: z.string().min(3).max(10).default('5+0'),
   rating: z.number().int().min(100).max(4000).default(1600),
 });
 

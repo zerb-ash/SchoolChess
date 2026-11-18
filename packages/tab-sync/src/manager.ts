@@ -12,6 +12,8 @@ export class TabSocketManager {
   private lockAbortController: AbortController | null = null;
   private yieldLockResolver: (() => void) | null = null;
   private activeSubscriptions = new Set<string>(); // gameIds this tab or follower tabs care about
+  private subscriptionColors = new Map<string, 'white' | 'black' | undefined>();
+  private outgoingQueue: unknown[] = [];
   private options: TabSyncOptions;
   private isDestroyed = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
@@ -20,7 +22,8 @@ export class TabSocketManager {
     this.options = options;
     this.wsUrl = options.wsUrl;
     this.token = options.token;
-    this.channelName = options.channelName || 'schoolchess_tab_bus';
+    const userScope = options.userId ? `_${options.userId}` : '';
+    this.channelName = options.channelName || `schoolchess_tab_bus${userScope}`;
     this.tabId = typeof crypto !== 'undefined' && crypto.randomUUID
       ? crypto.randomUUID()
       : `tab_${Math.random().toString(36).substring(2, 10)}`;
@@ -67,9 +70,11 @@ export class TabSocketManager {
     }
 
     this.lockAbortController = new AbortController();
+    const userScope = this.options.userId ? `_${this.options.userId}` : '';
+    const lockName = `schoolchess_ws_leader_lock${userScope}`;
 
     navigator.locks.request(
-      'schoolchess_ws_leader_lock',
+      lockName,
       { signal: this.lockAbortController.signal },
       async () => {
         if (this.isDestroyed) return;
@@ -173,9 +178,18 @@ export class TabSocketManager {
       this.broadcastIpc({ type: 'SERVER_CONNECTION_STATUS', isConnected: true });
       this.options.onConnectionChange?.(true);
 
-      // Re-subscribe any active rooms
+      // Re-subscribe any active rooms with preferred color
       for (const gameId of this.activeSubscriptions) {
-        this.socketSend({ type: 'game:join', payload: { gameId } });
+        const preferredColor = this.subscriptionColors.get(gameId);
+        this.socketSend({ type: 'game:join', payload: { gameId, preferredColor } });
+      }
+
+      // Flush queued messages
+      while (this.outgoingQueue.length > 0) {
+        const next = this.outgoingQueue.shift();
+        if (next && this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send(JSON.stringify(next));
+        }
       }
     };
 
@@ -205,11 +219,14 @@ export class TabSocketManager {
       this.socket.close();
       this.socket = null;
     }
+    this.outgoingQueue = [];
   }
 
   private socketSend(data: unknown): void {
     if (this.socket && this.socket.readyState === WebSocket.OPEN) {
       this.socket.send(JSON.stringify(data));
+    } else {
+      this.outgoingQueue.push(data);
     }
   }
 
@@ -234,8 +251,11 @@ export class TabSocketManager {
 
       case 'CLIENT_SUBSCRIBE':
         this.activeSubscriptions.add(msg.gameId);
+        if (msg.preferredColor) {
+          this.subscriptionColors.set(msg.gameId, msg.preferredColor);
+        }
         if (this.role === 'leader') {
-          this.socketSend({ type: 'game:join', payload: { gameId: msg.gameId } });
+          this.socketSend({ type: 'game:join', payload: { gameId: msg.gameId, preferredColor: msg.preferredColor } });
         }
         break;
 
@@ -278,6 +298,18 @@ export class TabSocketManager {
         this.options.onGameOver?.(msg.payload);
         break;
 
+      case 'SERVER_DRAW_OFFERED':
+        this.options.onDrawOffered?.(msg.payload);
+        break;
+
+      case 'SERVER_DRAW_DECLINED':
+        this.options.onDrawDeclined?.(msg.payload);
+        break;
+
+      case 'SERVER_PRESENCE':
+        this.options.onPresenceChange?.(msg.payload);
+        break;
+
       case 'SERVER_CONNECTION_STATUS':
         this.options.onConnectionChange?.(msg.isConnected);
         break;
@@ -308,21 +340,39 @@ export class TabSocketManager {
         this.options.onGameOver?.(msg.payload);
         this.broadcastIpc({ type: 'SERVER_GAME_OVER', payload: msg.payload });
         break;
+
+      case 'game:draw_offered':
+        this.options.onDrawOffered?.(msg.payload);
+        this.broadcastIpc({ type: 'SERVER_DRAW_OFFERED', payload: msg.payload });
+        break;
+
+      case 'game:draw_declined':
+        this.options.onDrawDeclined?.(msg.payload);
+        this.broadcastIpc({ type: 'SERVER_DRAW_DECLINED', payload: msg.payload });
+        break;
+
+      case 'game:presence':
+        this.options.onPresenceChange?.(msg.payload);
+        this.broadcastIpc({ type: 'SERVER_PRESENCE', payload: msg.payload });
+        break;
     }
   }
 
   // Public methods callable by React UI in ANY tab
-  public subscribeGame(gameId: string): void {
+  public subscribeGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string): void {
     this.activeSubscriptions.add(gameId);
+    if (preferredColor) {
+      this.subscriptionColors.set(gameId, preferredColor);
+    }
     if (this.role === 'leader') {
-      this.socketSend({ type: 'game:join', payload: { gameId } });
+      this.socketSend({ type: 'game:join', payload: { gameId, preferredColor, timeControl } });
     } else {
-      this.broadcastIpc({ type: 'CLIENT_SUBSCRIBE', tabId: this.tabId, gameId });
+      this.broadcastIpc({ type: 'CLIENT_SUBSCRIBE', tabId: this.tabId, gameId, preferredColor });
     }
   }
 
-  public joinGame(gameId: string): void {
-    this.subscribeGame(gameId);
+  public joinGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string): void {
+    this.subscribeGame(gameId, preferredColor, timeControl);
   }
 
   public disconnect(): void {

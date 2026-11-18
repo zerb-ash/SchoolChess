@@ -7,14 +7,14 @@ import { EvaluationBar } from '../../../components/board/EvaluationBar';
 import { useAppSettings } from '../../../lib/useSettings';
 import { soundSystem } from '../../../lib/audio';
 import { computeBotMove, evaluatePosition, PositionEvaluation } from '@schoolchess/chess-core';
-import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap } from 'lucide-react';
+import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap, Lock } from 'lucide-react';
 
 const BOT_LEVELS = [
-  { level: 1, name: 'Beginner Bot', elo: 200, desc: 'Casual starter bot. Makes blunders and exploratory moves.' },
-  { level: 2, name: 'Novice Bot', elo: 600, desc: 'Takes hanging pieces and avoids immediate 1-move traps.' },
-  { level: 3, name: 'Club Bot', elo: 1100, desc: 'Solid tactical play, searches 2 moves ahead.' },
-  { level: 4, name: 'Expert Bot', elo: 1600, desc: 'Positional awareness using piece-square tables.' },
-  { level: 5, name: 'Master Bot', elo: 2000, desc: 'Deep alpha-beta search with aggressive counter-attacks.' },
+  { level: 1, name: 'Beginner Bot', elo: 200, desc: 'Casual starter bot. Makes blunders and exploratory moves.', locked: false },
+  { level: 2, name: 'Novice Bot', elo: 600, desc: 'Takes hanging pieces and avoids immediate 1-move traps.', locked: false },
+  { level: 3, name: 'Club Bot', elo: 1100, desc: 'Solid tactical play, searches 2 moves ahead.', locked: false },
+  { level: 4, name: 'Expert Bot', elo: 1600, desc: 'Positional awareness using piece-square tables.', locked: true },
+  { level: 5, name: 'Master Bot', elo: 2000, desc: 'Deep alpha-beta search with aggressive counter-attacks.', locked: true },
 ];
 
 export default function PlayComputerPage() {
@@ -111,13 +111,11 @@ export default function PlayComputerPage() {
         if (res) {
           setFen(chess.fen());
           setLastMove({ from: move.from, to: move.to });
-          if (chess.inCheck()) {
-            soundSystem.playCheck();
-          } else if (res.captured) {
-            soundSystem.playCapture();
-          } else {
-            soundSystem.playMove();
-          }
+          soundSystem.playMoveEvent({
+            check: chess.inCheck(),
+            promotion: !!res.promotion,
+            captured: !!res.captured,
+          });
         }
       } catch {
         // No legal moves
@@ -147,13 +145,11 @@ export default function PlayComputerPage() {
       if (res) {
         setFen(chess.fen());
         setLastMove({ from, to });
-        if (chess.inCheck()) {
-          soundSystem.playCheck();
-        } else if (res.captured) {
-          soundSystem.playCapture();
-        } else {
-          soundSystem.playMove();
-        }
+        soundSystem.playMoveEvent({
+          check: chess.inCheck(),
+          promotion: !!res.promotion,
+          captured: !!res.captured,
+        });
       }
     } catch {
       // Illegal move
@@ -197,33 +193,92 @@ export default function PlayComputerPage() {
   const moveHistory = useMemo(() => chess.history(), [fen]);
   const currentBot = BOT_LEVELS.find((b) => b.level === botLevel) || BOT_LEVELS[0];
 
-  const topLabel = playerSide === 'white' ? `${currentBot.name} - Black` : `You - White`;
-  const bottomLabel = playerSide === 'white' ? `You - White` : `${currentBot.name} - Black`;
+  const topColor = orientation === 'white' ? 'black' : 'white';
+  const bottomColor = orientation === 'white' ? 'white' : 'black';
+
+  const isTopPlayer = playerSide === topColor;
+  const isBottomPlayer = playerSide === bottomColor;
+
+  const topLabel = isTopPlayer
+    ? `You - ${topColor === 'white' ? 'White' : 'Black'}`
+    : `${currentBot.name} - ${topColor === 'white' ? 'White' : 'Black'}`;
+
+  const bottomLabel = isBottomPlayer
+    ? `You - ${bottomColor === 'white' ? 'White' : 'Black'}`
+    : `${currentBot.name} - ${bottomColor === 'white' ? 'White' : 'Black'}`;
+
+  const topElo = isTopPlayer ? 'Player' : `Elo: ${currentBot.elo}`;
+  const bottomElo = isBottomPlayer ? 'Player' : `Elo: ${currentBot.elo}`;
 
   return (
-    <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-8 py-6 px-4">
-      {/* Board & Eval Bar Column */}
-      <div className="flex flex-col items-center w-full max-w-[660px]">
+    <div className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row items-center lg:items-start justify-center gap-6 py-6 px-4">
+      {/* Left Column: Bot Difficulty Picker */}
+      <div className="w-full lg:w-72 flex flex-col gap-4 order-2 lg:order-1">
+        <div className="bg-wood-900 border border-wood-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+          <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-brass-400" />
+            <span>Select Bot Opponent</span>
+          </h2>
+
+          <div className="flex flex-col gap-2">
+            {BOT_LEVELS.map((bot) => (
+              <button
+                key={bot.level}
+                onClick={() => {
+                  if (!bot.locked) setBotLevel(bot.level);
+                }}
+                disabled={bot.locked}
+                className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
+                  bot.locked
+                    ? 'border-wood-850 bg-wood-950/40 opacity-40 cursor-not-allowed select-none'
+                    : botLevel === bot.level
+                    ? 'border-brass-400 bg-wood-850 shadow-md cursor-pointer'
+                    : 'border-wood-800 bg-wood-950/60 hover:bg-wood-850 cursor-pointer'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    {bot.locked && <Lock className="w-3 h-3 text-parchment-500" />}
+                    <span className="text-xs font-bold text-parchment-100">{bot.name}</span>
+                  </div>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-wood-950 text-brass-400 font-mono">
+                    {bot.locked ? 'Locked' : `~${bot.elo} Elo`}
+                  </span>
+                </div>
+                <p className="text-[10px] text-parchment-400 leading-tight">
+                  {bot.locked ? 'Locked (optimization in progress).' : bot.desc}
+                </p>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Middle Column: Board & Eval Bar */}
+      <div className="flex flex-col items-center w-full max-w-[620px] order-1 lg:order-2">
         {/* Top Header */}
         <div className="w-full flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
-                orientation === 'white' ? 'bg-wood-950 border border-brass-500/40' : 'bg-parchment-100 shadow'
+                topColor === 'black' ? 'bg-wood-950 border border-brass-500/40' : 'bg-parchment-100 shadow'
               }`}
             />
             <span className="text-xs font-serif font-bold text-parchment-300">
               {topLabel}
             </span>
-            {isBotThinking && (
+            {isBotThinking && !isTopPlayer && (
               <span className="text-[10px] text-brass-400 animate-pulse font-mono flex items-center gap-1">
                 <Bot className="w-3 h-3" />
                 <span>Thinking...</span>
               </span>
             )}
+            {turn === (topColor === 'white' ? 'w' : 'b') && !gameOver && (
+              <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
+            )}
           </div>
           <span className="text-[11px] font-mono text-parchment-400">
-            {orientation === 'white' ? `Elo: ${currentBot.elo}` : 'Player'}
+            {topElo}
           </span>
         </div>
 
@@ -257,30 +312,35 @@ export default function PlayComputerPage() {
           </div>
         </div>
 
-        {/* Bottom Header (You) */}
+        {/* Bottom Header */}
         <div className="w-full flex items-center justify-between mt-2 px-1">
           <div className="flex items-center gap-2">
             <div
               className={`w-3 h-3 rounded-full ${
-                orientation === 'white' ? 'bg-parchment-100 shadow' : 'bg-wood-950 border border-brass-500/40'
+                bottomColor === 'white' ? 'bg-parchment-100 shadow' : 'bg-wood-950 border border-brass-500/40'
               }`}
             />
             <span className="text-xs font-serif font-bold text-parchment-100">
               {bottomLabel}
             </span>
-            {isPlayerTurn && !gameOver && (
+            {turn === (bottomColor === 'white' ? 'w' : 'b') && !gameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
             )}
           </div>
 
-          <button
-            onClick={handleToggleFlip}
-            className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="Flip Board View"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="text-[10px]">Flip Board</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] font-mono text-parchment-400">
+              {bottomElo}
+            </span>
+            <button
+              onClick={handleToggleFlip}
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Flip Board View"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="text-[10px]">Flip Board</span>
+            </button>
+          </div>
         </div>
 
         {/* Game Over Banner */}
@@ -294,46 +354,17 @@ export default function PlayComputerPage() {
         )}
       </div>
 
-      {/* Right Column: Bot Difficulty Picker & Controls */}
-      <div className="w-full lg:w-80 flex flex-col gap-4">
-        <div className="bg-wood-900 border border-wood-800 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
-          <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
-            <Bot className="w-4 h-4 text-brass-400" />
-            <span>Select Bot Opponent</span>
-          </h2>
-
-          <div className="flex flex-col gap-2">
-            {BOT_LEVELS.map((bot) => (
-              <button
-                key={bot.level}
-                onClick={() => setBotLevel(bot.level)}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
-                  botLevel === bot.level
-                    ? 'border-brass-400 bg-wood-850 shadow-md'
-                    : 'border-wood-800 bg-wood-950/60 hover:bg-wood-850'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-parchment-100">{bot.name}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-wood-950 text-brass-400 font-mono">
-                    ~{bot.elo} Elo
-                  </span>
-                </div>
-                <p className="text-[10px] text-parchment-400 leading-tight">{bot.desc}</p>
-              </button>
-            ))}
-          </div>
-        </div>
-
+      {/* Right Column: Move History, Play As, and Actions */}
+      <div className="w-full lg:w-72 flex flex-col gap-4 order-3">
         {/* Move History */}
-        <div className="bg-wood-900 border border-wood-800 rounded-xl p-4 shadow-xl flex flex-col h-[240px]">
+        <div className="bg-wood-900 border border-wood-800 rounded-xl p-4 shadow-xl flex flex-col h-[260px]">
           <h3 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-400 mb-2">
             Move History ({Math.ceil(moveHistory.length / 2)})
           </h3>
 
           <div className="flex-1 overflow-y-auto pr-1 space-y-1 font-mono text-xs">
             {moveHistory.length === 0 ? (
-              <p className="text-parchment-500 italic text-center py-8">Make your first move...</p>
+              <p className="text-parchment-500 italic text-center py-10">Make your first move...</p>
             ) : (
               <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                 {Array.from({ length: Math.ceil(moveHistory.length / 2) }).map((_, i) => (

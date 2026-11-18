@@ -6,6 +6,7 @@ import { Trophy, Medal, Flame, Zap, Clock, Crown, Users } from 'lucide-react';
 interface LeaderboardEntry {
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   rating: number;
   provisional: boolean;
   games: number;
@@ -60,9 +61,9 @@ export default function LeaderboardsPage() {
       {/* Rating System Tabs */}
       <div className="flex border-b border-wood-800 gap-2 overflow-x-auto pb-1">
         {[
-          { id: 'fide', label: 'FIDE-style (Elo)' },
-          { id: 'chess_com', label: 'Chess.com-style (Glicko-1)' },
-          { id: 'lichess', label: 'Lichess-style (Glicko-2)' },
+          { id: 'fide', label: 'FIDE' },
+          { id: 'chess_com', label: 'Chess.com' },
+          { id: 'lichess', label: 'Lichess' },
         ].map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -84,9 +85,9 @@ export default function LeaderboardsPage() {
       {/* Category Buttons */}
       <div className="flex items-center gap-2">
         {[
-          { id: 'blitz', label: 'Blitz (3m, 5m)', icon: Flame },
-          { id: 'rapid', label: 'Rapid (10m, 15m)', icon: Clock },
-          { id: 'bullet', label: 'Bullet (1m, 2m)', icon: Zap },
+          { id: 'blitz', label: 'Blitz', icon: Flame },
+          { id: 'rapid', label: 'Rapid', icon: Clock },
+          { id: 'bullet', label: 'Bullet', icon: Zap },
         ].map((cat) => {
           const Icon = cat.icon;
           const isActive = activeCat === cat.id;
@@ -157,9 +158,18 @@ export default function LeaderboardsPage() {
                       )}
                     </td>
                     <td className="py-3 px-4 font-bold text-parchment-100">
-                      <a href={`/profile/@${row.username}`} className="hover:text-brass-400 transition-colors">
-                        {row.username}
-                      </a>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-full overflow-hidden bg-wood-950 border border-brass-500/30 flex items-center justify-center font-bold text-xs text-brass-400 shrink-0 shadow-inner">
+                          {row.avatarUrl ? (
+                            <img src={row.avatarUrl} alt={row.username} className="w-full h-full object-cover" />
+                          ) : (
+                            <span>{row.username[0]?.toUpperCase()}</span>
+                          )}
+                        </div>
+                        <a href={`/profile/@${row.username}`} className="hover:text-brass-400 transition-colors">
+                          {row.username}
+                        </a>
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-mono font-bold text-brass-400 text-sm">
                       {row.rating}

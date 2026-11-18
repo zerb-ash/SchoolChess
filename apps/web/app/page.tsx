@@ -2,19 +2,20 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Play, Swords, Zap, Flame, Clock, ArrowRight, UserPlus } from 'lucide-react';
+import { Play, Swords, ArrowRight, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/useAuth';
 import { AuthModal } from '../components/auth/AuthModal';
+import { BulletIcon, BlitzIcon, RapidIcon } from '../components/icons/ChessModeIcons';
 
 export default function HomePage() {
   const { user } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
   const timeControls = [
-    { title: '1 min', sub: 'Bullet', speed: '1+0', icon: Zap },
-    { title: '3 min', sub: 'Blitz', speed: '3+0', icon: Flame },
-    { title: '5 min', sub: 'Blitz', speed: '5+0', icon: Flame },
-    { title: '10 min', sub: 'Rapid', speed: '10+0', icon: Clock },
+    { title: '1 min', sub: 'Bullet', speed: '1+0', icon: BulletIcon },
+    { title: '3 min', sub: 'Blitz', speed: '3+0', icon: BlitzIcon },
+    { title: '5 min', sub: 'Blitz', speed: '5+0', icon: BlitzIcon },
+    { title: '10 min', sub: 'Rapid', speed: '10+0', icon: RapidIcon },
   ];
 
   return (
@@ -34,29 +35,29 @@ export default function HomePage() {
             Multiplayer chess with rapid pairings, bot training, and multi-system ratings.
           </p>
 
-          <div className="flex items-center gap-3.5 pt-2">
+          <div className="flex flex-wrap items-center gap-3 pt-2">
             <Link
               href="/play"
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-wood-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-brass-700/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+              className="px-6 py-3 min-h-[44px] rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 text-wood-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-brass-700/20 transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <Play className="w-4 h-4 fill-current" />
-              <span>Play Online</span>
+              <Play className="w-4 h-4 fill-current shrink-0" />
+              <span>Play</span>
             </Link>
 
             <Link
               href="/sandbox"
-              className="px-6 py-3 rounded-xl bg-wood-950 hover:bg-wood-850 text-parchment-200 font-semibold text-xs uppercase tracking-wider border border-wood-700 hover:border-brass-500/40 transition-all flex items-center gap-2"
+              className="px-6 py-3 min-h-[44px] rounded-xl bg-wood-950 hover:bg-wood-850 text-parchment-200 font-semibold text-xs uppercase tracking-wider border border-wood-700 hover:border-brass-500/40 transition-all flex items-center justify-center gap-2 whitespace-nowrap"
             >
-              <Swords className="w-4 h-4 text-brass-400" />
-              <span>Pass & Play</span>
+              <Swords className="w-4 h-4 text-brass-400 shrink-0" />
+              <span>Sandbox</span>
             </Link>
 
             {!user && (
               <button
                 onClick={() => setAuthModalOpen(true)}
-                className="hidden sm:inline-flex px-4 py-3 text-xs font-semibold uppercase tracking-wider text-brass-400 hover:text-brass-300 transition-colors items-center gap-1.5 cursor-pointer"
+                className="hidden sm:inline-flex px-5 py-3 min-h-[44px] text-xs font-semibold uppercase tracking-wider text-brass-400 hover:text-brass-300 transition-colors items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
               >
-                <UserPlus className="w-3.5 h-3.5" />
+                <UserPlus className="w-3.5 h-3.5 shrink-0" />
                 <span>Create Account</span>
               </button>
             )}
@@ -119,7 +120,7 @@ export default function HomePage() {
                 className="p-5 rounded-2xl bg-wood-900 border border-wood-800 hover:border-brass-500/40 hover:bg-wood-850 flex flex-col gap-2 transition-all hover:-translate-y-0.5 shadow-lg group"
               >
                 <div className="flex items-center justify-between">
-                  <Icon className="w-5 h-5 text-brass-400 group-hover:scale-110 transition-transform" />
+                  <Icon className="w-5 h-5 group-hover:scale-110 transition-transform drop-shadow" />
                   <span className="text-xs font-mono font-bold text-parchment-500 group-hover:text-brass-300">
                     {tc.speed}
                   </span>

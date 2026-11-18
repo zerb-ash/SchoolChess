@@ -1,7 +1,7 @@
 import { WebSocket } from 'ws';
 import { ChessGameEngine, ValidatedMoveResult } from '@schoolchess/chess-core';
 import { AuthoritativeClock } from '../clock/authoritative-clock.js';
-import { MoveSubmission, DrawAction, PieceColor, GameTermination } from '@schoolchess/shared-types';
+import { MoveSubmission, DrawAction, PieceColor, GameTermination, GameResult } from '@schoolchess/shared-types';
 
 export interface PlayerInfo {
   id: string;
@@ -16,14 +16,16 @@ export interface GameRoomOptions {
   baseTimeSeconds: number;
   incrementSeconds: number;
   rated: boolean;
-  onGameOver?: (result: '1-0' | '0-1' | '1/2-1/2', termination: GameTermination, winnerId?: string) => void;
+  timeControl?: string;
+  onGameOver?: (result: GameResult, termination: GameTermination, winnerId?: string) => void;
 }
 
 export class GameRoom {
   public readonly gameId: string;
-  public readonly white: PlayerInfo;
+  public white: PlayerInfo;
   public black: PlayerInfo;
   public readonly rated: boolean;
+  public readonly timeControl: string;
   private engine: ChessGameEngine;
   private clock: AuthoritativeClock;
   private moveNumber = 0;
@@ -31,15 +33,19 @@ export class GameRoom {
   private sockets = new Set<WebSocket>();
   private status: 'pending' | 'active' | 'completed' | 'aborted' = 'active';
   private drawOfferFrom: 'w' | 'b' | null = null;
-  private onGameOverCallback?: (result: '1-0' | '0-1' | '1/2-1/2', termination: GameTermination, winnerId?: string) => void;
+  private onGameOverCallback?: (result: GameResult, termination: GameTermination, winnerId?: string) => void;
   private whiteConnected = false;
   private blackConnected = false;
+  private clockStarted = false;
+  private emptyRoomTimeout: NodeJS.Timeout | null = null;
+  private playerDisconnectTimeout: NodeJS.Timeout | null = null;
 
   constructor(options: GameRoomOptions) {
     this.gameId = options.gameId;
     this.white = options.white;
     this.black = options.black;
     this.rated = options.rated;
+    this.timeControl = options.timeControl || `${Math.floor(options.baseTimeSeconds / 60)}+${options.incrementSeconds}`;
     this.onGameOverCallback = options.onGameOver;
 
     this.engine = new ChessGameEngine();
@@ -48,11 +54,61 @@ export class GameRoom {
       options.incrementSeconds * 1000,
       (loserColor) => this.handleTimeout(loserColor)
     );
-    this.clock.start();
+    if (this.isBothSeated()) {
+      this.clockStarted = true;
+      this.clock.start();
+    }
+  }
+
+  public isWhiteConnected(): boolean {
+    return this.whiteConnected;
+  }
+
+  public isBlackConnected(): boolean {
+    return this.blackConnected;
+  }
+
+  public getStatus(): string {
+    return this.status;
+  }
+
+  public abortAbandonedRoom(): void {
+    if (this.status === 'active') {
+      this.finishGame('1/2-1/2', 'abandoned');
+    }
+  }
+
+  public isBothSeated(): boolean {
+    return (
+      !!this.white.id &&
+      this.white.id !== 'Waiting...' &&
+      this.white.id !== '' &&
+      !!this.black.id &&
+      this.black.id !== 'Waiting...' &&
+      this.black.id !== '' &&
+      this.black.id !== 'opponent_placeholder'
+    );
+  }
+
+  private checkStartClock(): void {
+    if (this.isBothSeated() && !this.clockStarted) {
+      this.clockStarted = true;
+      this.clock.start();
+    }
+  }
+
+  public setWhitePlayer(player: PlayerInfo): void {
+    this.white = player;
+    this.checkStartClock();
+    this.broadcast({
+      type: 'game:state',
+      payload: this.getStatePayload(),
+    });
   }
 
   public setBlackPlayer(player: PlayerInfo): void {
     this.black = player;
+    this.checkStartClock();
     this.broadcast({
       type: 'game:state',
       payload: this.getStatePayload(),
@@ -60,9 +116,19 @@ export class GameRoom {
   }
 
   public addSocket(ws: WebSocket, userId: string): void {
+    if (this.emptyRoomTimeout) {
+      clearTimeout(this.emptyRoomTimeout);
+      this.emptyRoomTimeout = null;
+    }
+
     this.sockets.add(ws);
     if (userId === this.white.id) this.whiteConnected = true;
     if (userId === this.black.id) this.blackConnected = true;
+
+    if (this.whiteConnected && this.blackConnected && this.playerDisconnectTimeout) {
+      clearTimeout(this.playerDisconnectTimeout);
+      this.playerDisconnectTimeout = null;
+    }
 
     this.sendTo(ws, {
       type: 'game:state',
@@ -90,6 +156,64 @@ export class GameRoom {
         blackConnected: this.blackConnected,
       },
     });
+
+    // Case 1: Room was waiting for an opponent and the creator/challenger leaves
+    if (!this.isBothSeated() && this.status === 'active') {
+      const hasWhite = !!this.white.id && this.white.id !== 'Waiting...';
+      const hasBlack = !!this.black.id && this.black.id !== 'Waiting...' && this.black.id !== 'opponent_placeholder';
+      const creatorConnected = (hasWhite && this.whiteConnected) || (hasBlack && this.blackConnected);
+
+      if (!creatorConnected) {
+        if (this.emptyRoomTimeout) clearTimeout(this.emptyRoomTimeout);
+        this.emptyRoomTimeout = setTimeout(() => {
+          const stillConnected = (hasWhite && this.whiteConnected) || (hasBlack && this.blackConnected);
+          if (!stillConnected && !this.isBothSeated() && this.status === 'active') {
+            this.finishGame('*', 'aborted');
+          }
+        }, 5000);
+      }
+    }
+
+    // Case 2: Game is active with 0 moves made and either player disconnects
+    if (this.isBothSeated() && this.moveNumber === 0 && this.status === 'active') {
+      if (!this.whiteConnected || !this.blackConnected) {
+        if (this.emptyRoomTimeout) clearTimeout(this.emptyRoomTimeout);
+        this.emptyRoomTimeout = setTimeout(() => {
+          if ((!this.whiteConnected || !this.blackConnected) && this.moveNumber === 0 && this.status === 'active') {
+            this.finishGame('*', 'aborted');
+          }
+        }, 15000);
+      }
+    }
+
+    // Case 3: Both players are disconnected from the game tab
+    if (!this.whiteConnected && !this.blackConnected && this.status === 'active') {
+      if (this.emptyRoomTimeout) clearTimeout(this.emptyRoomTimeout);
+      this.emptyRoomTimeout = setTimeout(() => {
+        if (!this.whiteConnected && !this.blackConnected && this.status === 'active') {
+          this.finishGame('1/2-1/2', 'abandoned');
+        }
+      }, 15000);
+    }
+
+    // Case 4: Moves have been played (>0) and ONE player disconnects: 60s reconnection window
+    if (this.isBothSeated() && this.moveNumber > 0 && this.status === 'active') {
+      if (!this.whiteConnected && this.blackConnected) {
+        if (this.playerDisconnectTimeout) clearTimeout(this.playerDisconnectTimeout);
+        this.playerDisconnectTimeout = setTimeout(() => {
+          if (!this.whiteConnected && this.blackConnected && this.status === 'active') {
+            this.finishGame('0-1', 'abandoned', this.black.id);
+          }
+        }, 60000);
+      } else if (!this.blackConnected && this.whiteConnected) {
+        if (this.playerDisconnectTimeout) clearTimeout(this.playerDisconnectTimeout);
+        this.playerDisconnectTimeout = setTimeout(() => {
+          if (!this.blackConnected && this.whiteConnected && this.status === 'active') {
+            this.finishGame('1-0', 'abandoned', this.white.id);
+          }
+        }, 60000);
+      }
+    }
   }
 
   public applyMove(userId: string, submission: MoveSubmission, clientWs: WebSocket): void {
@@ -142,6 +266,11 @@ export class GameRoom {
     this.moveNumber += 1;
     this.drawOfferFrom = null;
 
+    if (!this.clockStarted) {
+      this.clockStarted = true;
+      this.clock.start();
+    }
+
     const clockSnapshot = this.clock.recordMove(expectedColor);
 
     this.broadcast({
@@ -176,10 +305,12 @@ export class GameRoom {
 
   public handleResign(userId: string): void {
     if (this.status !== 'active') return;
-    if (userId !== this.white.id && userId !== this.black.id) return;
+    const isWhite = userId === this.white.id || (!!this.white.username && userId === this.white.username);
+    const isBlack = userId === this.black.id || (!!this.black.username && userId === this.black.username);
+    if (!isWhite && !isBlack) return;
 
-    const winnerId = userId === this.white.id ? this.black.id : this.white.id;
-    const result = userId === this.white.id ? '0-1' : '1-0';
+    const winnerId = isWhite ? this.black.id : this.white.id;
+    const result = isWhite ? '0-1' : '1-0';
     this.finishGame(result, 'resignation', winnerId);
   }
 
@@ -212,9 +343,19 @@ export class GameRoom {
     this.finishGame(result, 'timeout', winnerId);
   }
 
-  private finishGame(result: '1-0' | '0-1' | '1/2-1/2', termination: GameTermination, winnerId?: string): void {
-    this.status = 'completed';
+  private finishGame(result: GameResult, termination: GameTermination, winnerId?: string): void {
+    if (this.status === 'completed' || this.status === 'aborted') return;
+    this.status = termination === 'aborted' || (termination === 'abandoned' && this.moveNumber === 0) ? 'aborted' : 'completed';
     this.clock.stop();
+
+    if (this.emptyRoomTimeout) {
+      clearTimeout(this.emptyRoomTimeout);
+      this.emptyRoomTimeout = null;
+    }
+    if (this.playerDisconnectTimeout) {
+      clearTimeout(this.playerDisconnectTimeout);
+      this.playerDisconnectTimeout = null;
+    }
 
     this.broadcast({
       type: 'game:over',
@@ -227,6 +368,26 @@ export class GameRoom {
     });
 
     this.onGameOverCallback?.(result, termination, winnerId);
+
+    // Call API server to finalize ratings & persist game history
+    const apiBase = process.env.API_URL || 'http://localhost:4000';
+    fetch(`${apiBase}/api/v1/games/finish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gameId: this.gameId,
+        timeControl: this.timeControl,
+        whiteUserId: this.white.id,
+        whiteUsername: this.white.username,
+        blackUserId: this.black.id,
+        blackUsername: this.black.username,
+        result,
+        termination,
+        movesCount: this.moveNumber,
+        finalFen: this.engine.getFen(),
+        rated: this.rated,
+      }),
+    }).catch(() => {});
   }
 
   public getStatePayload() {
@@ -241,6 +402,7 @@ export class GameRoom {
       whiteClockMs: clockSnap.whiteMs,
       blackClockMs: clockSnap.blackMs,
       status: this.status,
+      history: this.engine.getMoveHistory(),
       serverTimestamp: Date.now(),
     };
   }
@@ -261,6 +423,14 @@ export class GameRoom {
   }
 
   public destroy(): void {
+    if (this.emptyRoomTimeout) {
+      clearTimeout(this.emptyRoomTimeout);
+      this.emptyRoomTimeout = null;
+    }
+    if (this.playerDisconnectTimeout) {
+      clearTimeout(this.playerDisconnectTimeout);
+      this.playerDisconnectTimeout = null;
+    }
     this.clock.stop();
     this.sockets.clear();
   }

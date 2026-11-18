@@ -25,7 +25,6 @@ export interface AppSettings {
   volume: number;
   enablePremoves: boolean;
   autoQueenPromotion: boolean;
-  animationSpeed: 'fast' | 'normal' | 'instant';
   autoFlipWhenBlack: boolean;
   highContrastHighlight: boolean;
 }
@@ -41,27 +40,70 @@ const DEFAULT_SETTINGS: AppSettings = {
   volume: 0.7,
   enablePremoves: true,
   autoQueenPromotion: false,
-  animationSpeed: 'normal',
   autoFlipWhenBlack: true,
   highContrastHighlight: false,
 };
 
 const STORAGE_KEY = 'schoolchess_user_settings_v1';
 
+const getInitialSettings = (): AppSettings => {
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+      }
+    } catch {}
+  }
+  return DEFAULT_SETTINGS;
+};
+
+function applyCssTheme(s: AppSettings) {
+  if (typeof document === 'undefined') return;
+  const colors =
+    s.themeName === 'custom'
+      ? { light: s.customLight, dark: s.customDark }
+      : PRESET_THEMES[s.themeName] || PRESET_THEMES.walnut;
+  document.documentElement.style.setProperty('--board-light', colors.light);
+  document.documentElement.style.setProperty('--board-dark', colors.dark);
+}
+
 export function useAppSettings() {
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<AppSettings>(getInitialSettings);
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(stored) });
+        const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+        setSettings(parsed);
+        applyCssTheme(parsed);
+      } else {
+        applyCssTheme(DEFAULT_SETTINGS);
       }
     } catch {
-      // Fallback to default
+      applyCssTheme(DEFAULT_SETTINGS);
     }
     setIsLoaded(true);
+
+    const handleSync = (e: Event) => {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          const parsed = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+          setSettings(parsed);
+          applyCssTheme(parsed);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('schoolchess_settings_updated', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('schoolchess_settings_updated', handleSync);
+    };
   }, []);
 
   const updateSettings = (updates: Partial<AppSettings>) => {
@@ -69,9 +111,11 @@ export function useAppSettings() {
       const next = { ...prev, ...updates };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // LocalStorage quota or disabled
-      }
+        applyCssTheme(next);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('schoolchess_settings_updated', { detail: next }));
+        }
+      } catch {}
       return next;
     });
   };

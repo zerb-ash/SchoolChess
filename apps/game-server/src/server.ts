@@ -57,31 +57,102 @@ export function buildGameServer() {
             case 'game:join': {
               const parse = GameJoinSchema.safeParse(msg.payload);
               if (!parse.success) return;
-              const { gameId } = parse.data;
+              const { gameId, preferredColor, timeControl } = parse.data;
 
               activeGameId = gameId;
 
               let room = roomManager.getRoom(gameId);
               if (!room) {
+                const firstPlayerIsBlack = preferredColor === 'black';
+                const tc = timeControl || '5+0';
+                const [baseStr, incStr] = tc.split('+');
+                const baseTimeSeconds = (parseInt(baseStr, 10) || 5) * 60;
+                const incrementSeconds = parseInt(incStr, 10) || 0;
+
                 room = roomManager.getOrCreateRoom({
                   gameId,
-                  white: { id: authenticatedUserId, username: authenticatedUsername, rating: 200 },
-                  black: { id: '', username: 'Waiting...', rating: 200 },
-                  baseTimeSeconds: 300,
-                  incrementSeconds: 0,
+                  white: firstPlayerIsBlack
+                    ? { id: '', username: 'Waiting...', rating: 200 }
+                    : { id: authenticatedUserId, username: authenticatedUsername, rating: 200 },
+                  black: firstPlayerIsBlack
+                    ? { id: authenticatedUserId, username: authenticatedUsername, rating: 200 }
+                    : { id: '', username: 'Waiting...', rating: 200 },
+                  baseTimeSeconds,
+                  incrementSeconds,
                   rated: true,
+                  timeControl: tc,
                 });
-              } else if (
-                !room.black.id ||
-                room.black.id === 'Waiting...' ||
-                room.black.id === '' ||
-                room.black.id === 'opponent_placeholder'
-              ) {
-                room.setBlackPlayer({
-                  id: authenticatedUserId,
-                  username: authenticatedUsername,
-                  rating: 200,
-                });
+              } else {
+                if (room.getStatus() !== 'active') {
+                  socket.send(
+                    JSON.stringify({
+                      type: 'game:over',
+                      payload: {
+                        gameId,
+                        result: '1/2-1/2',
+                        termination: 'abandoned',
+                      },
+                    })
+                  );
+                  return;
+                }
+
+                // If room is waiting for an opponent and the creator has disconnected
+                if (!room.isBothSeated()) {
+                  const isCreatorWhite = !!room.white.id && room.white.id !== 'Waiting...';
+                  const isCreatorBlack = !!room.black.id && room.black.id !== 'Waiting...' && room.black.id !== 'opponent_placeholder';
+                  const creatorConnected = (isCreatorWhite && room.isWhiteConnected()) || (isCreatorBlack && room.isBlackConnected());
+                  const isCreatorRejoining = room.white.id === authenticatedUserId || room.black.id === authenticatedUserId;
+
+                  if (!creatorConnected && !isCreatorRejoining) {
+                    room.abortAbandonedRoom();
+                    socket.send(
+                      JSON.stringify({
+                        type: 'game:over',
+                        payload: {
+                          gameId,
+                          result: '1/2-1/2',
+                          termination: 'abandoned',
+                        },
+                      })
+                    );
+                    return;
+                  }
+                }
+
+                const isAlreadyWhite = room.white.id === authenticatedUserId;
+                const isAlreadyBlack = room.black.id === authenticatedUserId;
+
+                if (!isAlreadyWhite && !isAlreadyBlack) {
+                  const isWhiteEmpty = !room.white.id || room.white.id === 'Waiting...' || room.white.id === '';
+                  const isBlackEmpty = !room.black.id || room.black.id === 'Waiting...' || room.black.id === '' || room.black.id === 'opponent_placeholder';
+
+                  if (preferredColor === 'white' && isWhiteEmpty) {
+                    room.setWhitePlayer({
+                      id: authenticatedUserId,
+                      username: authenticatedUsername,
+                      rating: 200,
+                    });
+                  } else if (preferredColor === 'black' && isBlackEmpty) {
+                    room.setBlackPlayer({
+                      id: authenticatedUserId,
+                      username: authenticatedUsername,
+                      rating: 200,
+                    });
+                  } else if (isWhiteEmpty) {
+                    room.setWhitePlayer({
+                      id: authenticatedUserId,
+                      username: authenticatedUsername,
+                      rating: 200,
+                    });
+                  } else if (isBlackEmpty) {
+                    room.setBlackPlayer({
+                      id: authenticatedUserId,
+                      username: authenticatedUsername,
+                      rating: 200,
+                    });
+                  }
+                }
               }
 
               room.addSocket(socket, authenticatedUserId);

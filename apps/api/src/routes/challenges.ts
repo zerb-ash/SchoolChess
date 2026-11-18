@@ -68,9 +68,10 @@ export async function challengesRoutes(app: FastifyInstance) {
     const { creatorId, creatorUsername, timeControl, side, rated } = parseRes.data;
 
     const isGuest = !creatorId || creatorId.startsWith('guest_') || creatorId.startsWith('anon_');
+    const isLocalhost = req.ip === '127.0.0.1' || req.ip === '::1' || req.ip === 'localhost';
     const rateLimitKey = req.ip || creatorId || 'anon';
 
-    if (!checkChallengeRateLimit(rateLimitKey, isGuest)) {
+    if (!isLocalhost && !checkChallengeRateLimit(rateLimitKey, isGuest)) {
       return reply.code(429).send({
         message: isGuest
           ? 'Guest challenge limit reached (1 challenge per minute). Please create an account for higher limits.'
@@ -112,6 +113,17 @@ export async function challengesRoutes(app: FastifyInstance) {
       return reply.code(404).send({ message: 'Challenge not found or expired' });
     }
     return reply.send({ challenge });
+  });
+
+  app.delete('/api/v1/challenges/:token', async (req: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+    const { token } = req.params;
+    const challenge = activeChallenges.get(token);
+    if (challenge) {
+      challenge.status = 'cancelled';
+      shortCodeMap.delete(challenge.shortCode);
+      activeChallenges.delete(token);
+    }
+    return reply.send({ success: true });
   });
 
   app.post('/api/v1/challenges/:token/accept', async (req: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {

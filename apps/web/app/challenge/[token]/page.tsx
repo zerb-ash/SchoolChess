@@ -42,14 +42,17 @@ export default function ChallengePage() {
       setChallenge(data.challenge);
 
       if (data.challenge.status === 'accepted' && data.challenge.gameId) {
-        router.push(`/game/${data.challenge.gameId}`);
+        const creatorIdStored = typeof window !== 'undefined' ? sessionStorage.getItem(`challenge_creator_id_${token}`) : null;
+        const myId = user?.id || creatorIdStored || data.challenge.creatorId;
+        const creatorColor = data.challenge.whitePlayer?.id === myId ? 'white' : 'black';
+        router.push(`/game/${data.challenge.gameId}?color=${creatorColor}`);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load challenge');
     } finally {
       setLoading(false);
     }
-  }, [token, router]);
+  }, [token, router, user?.id]);
 
   useEffect(() => {
     fetchChallenge();
@@ -63,6 +66,13 @@ export default function ChallengePage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const handleCancelChallenge = async () => {
+    try {
+      await fetch(`${API_BASE}/api/v1/challenges/${token}`, { method: 'DELETE' });
+    } catch {}
+    router.push('/play');
   };
 
   const handleAccept = async () => {
@@ -83,7 +93,7 @@ export default function ChallengePage() {
       }
 
       const data = await res.json();
-      router.push(`/game/${data.gameId}`);
+      router.push(`/game/${data.gameId}?color=${data.yourColor || 'black'}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error accepting challenge');
       setAccepting(false);
@@ -116,7 +126,10 @@ export default function ChallengePage() {
     );
   }
 
-  const isCreator = user && user.id === challenge.creatorId;
+  const isCreatorSession =
+    (typeof window !== 'undefined' && sessionStorage.getItem(`created_challenge_${token}`) === 'true') ||
+    (typeof window !== 'undefined' && sessionStorage.getItem(`challenge_creator_id_${token}`) === challenge.creatorId);
+  const isCreator = (user && user.id === challenge.creatorId) || isCreatorSession;
 
   return (
     <div className="flex-1 max-w-xl mx-auto w-full px-4 py-12 flex flex-col items-center justify-center">
@@ -190,6 +203,13 @@ export default function ChallengePage() {
               <div className="w-2 h-2 rounded-full bg-brass-400" />
               <span>Awaiting opponent to take a seat at the board...</span>
             </div>
+
+            <button
+              onClick={handleCancelChallenge}
+              className="mt-3 w-full py-2.5 rounded-xl bg-wood-950 hover:bg-wood-850 text-parchment-400 hover:text-red-400 text-xs font-semibold border border-wood-800 transition-colors cursor-pointer"
+            >
+              Cancel Challenge
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pt-2">

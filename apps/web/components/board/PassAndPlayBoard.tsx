@@ -34,8 +34,6 @@ export const PassAndPlayBoard: React.FC = () => {
   const [history, setHistory] = useState<PositionSnapshot[]>([{ fen: chess.fen() }]);
   const [viewIndex, setViewIndex] = useState(0);
   const [orientation, setOrientation] = useState<'white' | 'black'>('white');
-  const [confirmResign, setConfirmResign] = useState(false);
-  const [drawOffer, setDrawOffer] = useState<boolean>(false);
   const [isFenPgnModalOpen, setIsFenPgnModalOpen] = useState(false);
   const [customTermination, setCustomTermination] = useState<{ result: string; reason: string } | null>(null);
 
@@ -124,15 +122,12 @@ export const PassAndPlayBoard: React.FC = () => {
         setHistory(updatedHistory);
         setViewIndex(updatedHistory.length - 1);
 
-        if (chess.isCheckmate()) {
-          soundSystem.playGameOver();
-        } else if (chess.inCheck()) {
-          soundSystem.playCheck();
-        } else if (move.captured) {
-          soundSystem.playCapture();
-        } else {
-          soundSystem.playMove();
-        }
+        soundSystem.playMoveEvent({
+          gameOver: chess.isCheckmate(),
+          check: chess.inCheck(),
+          promotion: !!move.promotion,
+          captured: !!move.captured,
+        });
       }
     } catch {
       // Invalid move
@@ -145,24 +140,6 @@ export const PassAndPlayBoard: React.FC = () => {
     setHistory([{ fen: initFen }]);
     setViewIndex(0);
     setCustomTermination(null);
-    setDrawOffer(false);
-    setConfirmResign(false);
-  };
-
-  const handleResign = () => {
-    if (!confirmResign) {
-      setConfirmResign(true);
-      setTimeout(() => setConfirmResign(false), 4000);
-      return;
-    }
-
-    const winner = currentTurn === 'w' ? 'Black' : 'White';
-    setCustomTermination({
-      result: currentTurn === 'w' ? '0-1' : '1-0',
-      reason: `${currentTurn === 'w' ? 'White' : 'Black'} resigned. ${winner} wins!`,
-    });
-    setConfirmResign(false);
-    soundSystem.playGameOver();
   };
 
   const handleClaimDraw = (reason: 'threefold' | 'fifty') => {
@@ -170,15 +147,6 @@ export const PassAndPlayBoard: React.FC = () => {
       result: '1/2-1/2',
       reason: reason === 'threefold' ? 'Draw claimed by Threefold Repetition' : 'Draw claimed by 50-move rule',
     });
-    soundSystem.playGameOver();
-  };
-
-  const handleAcceptDraw = () => {
-    setCustomTermination({
-      result: '1/2-1/2',
-      reason: 'Game drawn by mutual agreement',
-    });
-    setDrawOffer(false);
     soundSystem.playGameOver();
   };
 
@@ -251,8 +219,8 @@ export const PassAndPlayBoard: React.FC = () => {
               {orientation === 'white' ? 'Black' : 'White'}
             </span>
             <CapturedPieces
-              captured={orientation === 'white' ? whiteCaptured : blackCaptured}
-              advantage={orientation === 'white' ? whiteAdvantage : blackAdvantage}
+              captured={orientation === 'white' ? blackCaptured : whiteCaptured}
+              advantage={orientation === 'white' ? blackAdvantage : whiteAdvantage}
             />
           </div>
         </div>
@@ -285,26 +253,26 @@ export const PassAndPlayBoard: React.FC = () => {
               {orientation === 'white' ? 'White' : 'Black'}
             </span>
             <CapturedPieces
-              captured={orientation === 'white' ? blackCaptured : whiteCaptured}
-              advantage={orientation === 'white' ? blackAdvantage : whiteAdvantage}
+              captured={orientation === 'white' ? whiteCaptured : blackCaptured}
+              advantage={orientation === 'white' ? whiteAdvantage : blackAdvantage}
             />
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setOrientation((prev) => (prev === 'white' ? 'black' : 'white'))}
-              className="p-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs flex items-center gap-1.5"
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Flip Board"
             >
-              <ArrowUpDown className="w-3.5 h-3.5" />
+              <ArrowUpDown className="w-3.5 h-3.5 text-brass-400" />
               <span>Flip</span>
             </button>
             <button
               onClick={handleReset}
-              className="p-1.5 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 text-xs flex items-center gap-1.5"
+              className="p-1.5 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-lg border border-wood-800 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Reset Game"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3.5 h-3.5 text-brass-400" />
               <span>Reset</span>
             </button>
           </div>
@@ -312,9 +280,9 @@ export const PassAndPlayBoard: React.FC = () => {
 
         {/* Game Over Banner */}
         {isGameOver && (
-          <div className="w-full mt-4 p-4 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-center flex items-center justify-center gap-3 animate-fade-in shadow-xl">
-            <Trophy className="w-5 h-5 text-emerald-400" />
-            <span className="font-bold text-emerald-200 text-sm">{getTerminationSummary()}</span>
+          <div className="w-full mt-4 p-4 rounded-xl bg-wood-900 border border-brass-500/40 text-center flex items-center justify-center gap-3 animate-fadeIn shadow-2xl">
+            <Trophy className="w-5 h-5 text-brass-400" />
+            <span className="font-serif font-bold text-parchment-100 text-sm">{getTerminationSummary()}</span>
           </div>
         )}
       </div>
@@ -340,29 +308,6 @@ export const PassAndPlayBoard: React.FC = () => {
             <Handshake className="w-4 h-4" />
             <span>Claim Draw (Threefold Repetition)</span>
           </button>
-        )}
-
-        {/* Draw Offer Banner */}
-        {drawOffer && !isGameOver && (
-          <div className="p-3 rounded-xl bg-wood-900 border border-brass-500/30 flex flex-col gap-2">
-            <span className="text-xs font-semibold text-parchment-200 text-center">
-              Opponent offered a draw. Accept?
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={handleAcceptDraw}
-                className="flex-1 py-1.5 bg-brass-600 hover:bg-brass-500 text-wood-950 rounded-lg text-xs font-bold"
-              >
-                Accept Draw
-              </button>
-              <button
-                onClick={() => setDrawOffer(false)}
-                className="flex-1 py-1.5 bg-wood-850 hover:bg-wood-800 text-parchment-300 rounded-lg text-xs font-bold"
-              >
-                Decline
-              </button>
-            </div>
-          </div>
         )}
 
         {/* Move History Table */}
@@ -417,38 +362,14 @@ export const PassAndPlayBoard: React.FC = () => {
           </div>
         </div>
 
-        {/* Action Buttons: Offer Draw, Resign, FEN/PGN */}
-        <div className="grid grid-cols-3 gap-2">
-          <button
-            onClick={() => setDrawOffer(true)}
-            disabled={isGameOver || isViewingHistory}
-            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-40"
-          >
-            <Handshake className="w-4 h-4 text-brass-500" />
-            <span>Offer Draw</span>
-          </button>
-
-          <button
-            onClick={handleResign}
-            disabled={isGameOver || isViewingHistory}
-            className={`py-2.5 px-2 rounded-xl border text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors disabled:opacity-40 ${
-              confirmResign
-                ? 'bg-salon-crimson/30 border-salon-crimson text-red-200 animate-pulse'
-                : 'bg-wood-900 hover:bg-wood-850 text-parchment-300 border-wood-800'
-            }`}
-          >
-            <Flag className="w-4 h-4 text-salon-crimson" />
-            <span>{confirmResign ? 'Confirm?' : 'Resign'}</span>
-          </button>
-
-          <button
-            onClick={() => setIsFenPgnModalOpen(true)}
-            className="py-2.5 px-2 bg-wood-900 hover:bg-wood-850 text-parchment-300 rounded-xl border border-wood-800 text-xs font-semibold flex flex-col items-center justify-center gap-1 transition-colors"
-          >
-            <FileText className="w-4 h-4 text-brass-500" />
-            <span>FEN / PGN</span>
-          </button>
-        </div>
+        {/* Action Button: FEN / PGN */}
+        <button
+          onClick={() => setIsFenPgnModalOpen(true)}
+          className="w-full py-2.5 px-4 bg-wood-900 hover:bg-wood-850 text-parchment-200 rounded-xl border border-wood-800 hover:border-brass-500/40 text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer"
+        >
+          <FileText className="w-4 h-4 text-brass-400" />
+          <span>FEN / PGN</span>
+        </button>
       </div>
 
       {/* FEN / PGN Modal */}

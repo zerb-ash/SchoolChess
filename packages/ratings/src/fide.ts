@@ -1,7 +1,7 @@
 import { FideEloState, RatingCalculationResult } from '@schoolchess/shared-types';
 
 export const FIDE_CONFIG = {
-  MIN_RATING_FLOOR: 1400,
+  MIN_RATING_FLOOR: 100,
   PROVISIONAL_GAMES_THRESHOLD: 30,
   K_FACTOR_PROVISIONAL_OR_JUNIOR: 40,
   K_FACTOR_STANDARD: 20,

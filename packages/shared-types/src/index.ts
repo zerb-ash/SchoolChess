@@ -70,7 +70,8 @@ export const GameTerminationEnum = z.enum([
   'fivefold_repetition',
   'fifty_moves',
   'seventy_five_moves',
-  'abandoned'
+  'abandoned',
+  'aborted'
 ]);
 export type GameTermination = z.infer<typeof GameTerminationEnum>;
 
@@ -84,28 +85,30 @@ export const ChessSquareSchema = z.string().regex(ChessSquareRegex, { message: '
 // 4. WEBSOCKET PACKET SCHEMAS (Sub-50ms Hot-Path)
 // ==========================================
 export const MoveSubmissionSchema = z.object({
-  gameId: z.string().uuid(),
+  gameId: z.string().min(1),
   from: ChessSquareSchema,
   to: ChessSquareSchema,
   promotion: z.enum(['q', 'r', 'b', 'n']).optional(),
   expectedMoveNumber: z.number().int().min(0),
-  idempotencyKey: z.string().uuid(),
+  idempotencyKey: z.string().min(1),
 });
 export type MoveSubmission = z.infer<typeof MoveSubmissionSchema>;
 
 export const GameJoinSchema = z.object({
-  gameId: z.string().uuid(),
+  gameId: z.string().min(1),
+  preferredColor: z.enum(['white', 'black']).optional(),
+  timeControl: z.string().optional(),
 });
 export type GameJoin = z.infer<typeof GameJoinSchema>;
 
 export const DrawActionSchema = z.object({
-  gameId: z.string().uuid(),
+  gameId: z.string().min(1),
   action: z.enum(['offer', 'accept', 'decline', 'claim_repetition', 'claim_fifty']),
 });
 export type DrawAction = z.infer<typeof DrawActionSchema>;
 
 export const ResignSchema = z.object({
-  gameId: z.string().uuid(),
+  gameId: z.string().min(1),
 });
 export type ResignPayload = z.infer<typeof ResignSchema>;
 
@@ -139,6 +142,7 @@ export interface GameStateEvent {
   blackClockMs: number;
   timeControl: string;
   status: 'pending' | 'active' | 'completed' | 'aborted';
+  history?: string[];
   serverTimestamp: number;
 }
 

@@ -6,6 +6,8 @@ export interface AuthUser {
   id: string;
   username: string;
   createdAt: string;
+  bio?: string;
+  avatarUrl?: string;
   ratings?: {
     fide: number;
     chesscom: number;
@@ -29,19 +31,64 @@ export function useAuth() {
       if (res.ok) {
         const data = await res.json();
         if (data.user) {
+          let avatarUrl = data.user.avatarUrl || '';
+          let bio = data.user.bio || 'No bio';
+          try {
+            const pRes = await fetch(`${API_BASE}/api/v1/users/${data.user.username}`);
+            if (pRes.ok) {
+              const pData = await pRes.json();
+              if (pData.user?.avatarUrl) avatarUrl = pData.user.avatarUrl;
+              if (pData.user?.bio) bio = pData.user.bio;
+            }
+          } catch {
+            // Keep existing avatarUrl
+          }
+
           const fullUser: AuthUser = {
             ...data.user,
+            avatarUrl,
+            bio,
             ratings: data.user.ratings || { fide: 200, chesscom: 200, lichess: 200 },
           };
           setUser(fullUser);
           localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(fullUser));
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: fullUser }));
+          }
         } else {
           setUser(null);
           localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
         }
       } else {
-        setUser(null);
-        localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+        const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
+        if (stored) {
+          try {
+            const parsed: AuthUser = JSON.parse(stored);
+            if (parsed?.username) {
+              try {
+                const pRes = await fetch(`${API_BASE}/api/v1/users/${parsed.username}`);
+                if (pRes.ok) {
+                  const pData = await pRes.json();
+                  if (pData.user?.avatarUrl) parsed.avatarUrl = pData.user.avatarUrl;
+                  if (pData.user?.bio) parsed.bio = pData.user.bio;
+                }
+              } catch {
+                // Keep parsed
+              }
+              setUser(parsed);
+              localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(parsed));
+            } else {
+              setUser(null);
+              localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+            }
+          } catch {
+            setUser(null);
+            localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+          }
+        } else {
+          setUser(null);
+          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+        }
       }
     } catch {
       const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
@@ -59,8 +106,34 @@ export function useAuth() {
     }
   }, []);
 
+  const updateUser = useCallback((partial: Partial<AuthUser>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated: AuthUser = { ...prev, ...partial };
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(updated));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: updated }));
+      }
+      return updated;
+    });
+  }, []);
+
   useEffect(() => {
     refreshUser();
+
+    const handleUpdate = (e: Event) => {
+      const custom = e as CustomEvent<AuthUser>;
+      if (custom.detail) {
+        setUser(custom.detail);
+      } else {
+        refreshUser();
+      }
+    };
+
+    window.addEventListener('schoolchess_user_updated', handleUpdate);
+    return () => {
+      window.removeEventListener('schoolchess_user_updated', handleUpdate);
+    };
   }, [refreshUser]);
 
   const register = async (username: string, password: string): Promise<boolean> => {
@@ -79,6 +152,21 @@ export function useAuth() {
         throw new Error(data.message || 'Registration failed');
       }
 
+      const data = await res.json();
+      const newUser: AuthUser = {
+        id: data.id,
+        username: data.username,
+        createdAt: data.createdAt,
+        bio: 'No bio',
+        avatarUrl: '',
+        ratings: { fide: 200, chesscom: 200, lichess: 200 },
+      };
+      setUser(newUser);
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(newUser));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: newUser }));
+      }
+
       await refreshUser();
       return true;
     } catch (err: unknown) {
@@ -92,6 +180,9 @@ export function useAuth() {
         };
         setUser(mockUser);
         localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(mockUser));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: mockUser }));
+        }
         setLoading(false);
         return true;
       }
@@ -117,6 +208,21 @@ export function useAuth() {
         throw new Error(data.message || 'Login failed');
       }
 
+      const data = await res.json();
+      const loggedUser: AuthUser = {
+        id: data.id,
+        username: data.username,
+        createdAt: data.createdAt,
+        bio: data.bio || 'No bio',
+        avatarUrl: data.avatarUrl || '',
+        ratings: data.ratings || { fide: 200, chesscom: 200, lichess: 200 },
+      };
+      setUser(loggedUser);
+      localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(loggedUser));
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: loggedUser }));
+      }
+
       await refreshUser();
       return true;
     } catch (err: unknown) {
@@ -130,6 +236,9 @@ export function useAuth() {
         };
         setUser(mockUser);
         localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(mockUser));
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: mockUser }));
+        }
         setLoading(false);
         return true;
       }
@@ -150,6 +259,9 @@ export function useAuth() {
     }
     setUser(null);
     localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('schoolchess_user_updated', { detail: null }));
+    }
   };
 
   return {
@@ -160,5 +272,6 @@ export function useAuth() {
     register,
     logout,
     refreshUser,
+    updateUser,
   };
 }

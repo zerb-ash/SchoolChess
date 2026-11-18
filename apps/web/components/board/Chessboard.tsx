@@ -16,8 +16,11 @@ export interface ChessboardProps {
   premove?: { from: string; to: string } | null;
   isCheck?: boolean;
   turn?: 'w' | 'b';
+  myColor?: 'w' | 'b';
   autoQueen?: boolean;
+  animationSpeed?: 'fast' | 'normal' | 'instant';
   onMakeMove?: (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => void;
+  onCancelPremove?: () => void;
   getLegalMovesForSquare?: (square: string) => string[];
   disabled?: boolean;
 }
@@ -55,8 +58,11 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   premove = null,
   isCheck = false,
   turn = 'w',
+  myColor,
   autoQueen = false,
+  animationSpeed = 'normal',
   onMakeMove,
+  onCancelPremove,
   getLegalMovesForSquare,
   disabled = false,
 }) => {
@@ -79,11 +85,20 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     startY: number;
     square: string;
     piece: PieceSymbol | null;
+    pointerType?: string;
   } | null>(null);
 
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
   const wasLongPressRef = useRef(false);
   const lastTapRef = useRef<{ square: string; time: number } | null>(null);
+
+  const canSelectPiece = (piece: PieceSymbol | null) => {
+    if (!piece) return false;
+    if (myColor) {
+      return piece.startsWith(myColor);
+    }
+    return piece.startsWith(turn);
+  };
 
   const toggleRedSquare = (square: string) => {
     setRedSquares((prev) => {
@@ -139,7 +154,6 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   const executeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
     if (onMakeMove) {
       onMakeMove(from, to, promotion);
-      soundSystem.playMove();
       clearRedSquares();
     }
   };
@@ -154,15 +168,15 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   };
 
   const tryMove = (from: string, to: string): boolean => {
-    if (!legalDestinations.includes(to)) return false;
+    if (legalDestinations.length > 0 && !legalDestinations.includes(to)) return false;
 
     const isWhitePawn = from[1] === '7' && to[1] === '8';
     const isBlackPawn = from[1] === '2' && to[1] === '1';
     const [fileIdx, rankIdx] = getIndicesFromSquare(from);
-    const movingPiece = boardMatrix[rankIdx][fileIdx];
+    const movingPiece = boardMatrix[rankIdx]?.[fileIdx];
 
     if (movingPiece && movingPiece.endsWith('P') && (isWhitePawn || isBlackPawn)) {
-      if (autoQueen) {
+      if (autoQueen || (myColor && myColor !== turn)) {
         executeMove(from, to, 'q');
         setSelectedSquare(null);
         setHoveredSquare(null);
@@ -192,7 +206,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
       if (tryMove(selectedSquare, square)) {
         return;
       }
-      if (piece && piece.startsWith(turn)) {
+      if (piece && canSelectPiece(piece)) {
         setSelectedSquare(square);
         return;
       }
@@ -200,7 +214,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
       return;
     }
 
-    if (piece && piece.startsWith(turn)) {
+    if (piece && canSelectPiece(piece)) {
       setSelectedSquare(square);
     }
   };
@@ -209,26 +223,32 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     if (disabled || pendingPromotion) return;
 
     if (e.button === 2) {
-      toggleRedSquare(square);
+      if (premove && onCancelPremove) {
+        onCancelPremove();
+      }
       return;
     }
 
     wasLongPressRef.current = false;
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
 
-    // Long press detection for mobile/touch users (400ms hold)
-    longPressTimerRef.current = setTimeout(() => {
-      wasLongPressRef.current = true;
-      toggleRedSquare(square);
-    }, 400);
+    // Long press detection ONLY for touch/pen users (400ms hold)
+    if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+      longPressTimerRef.current = setTimeout(() => {
+        wasLongPressRef.current = true;
+        toggleRedSquare(square);
+      }, 400);
+    }
 
     pointerDownRef.current = {
       startX: e.clientX,
       startY: e.clientY,
       square,
       piece,
+      pointerType: e.pointerType,
     };
   };
 
@@ -242,9 +262,10 @@ export const Chessboard: React.FC<ChessboardProps> = ({
     if (hasMoved) {
       if (longPressTimerRef.current) {
         clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
       }
 
-      if (down.piece && down.piece.startsWith(turn)) {
+      if (down.piece && canSelectPiece(down.piece)) {
         setDragState({
           piece: down.piece,
           fromSquare: down.square,
@@ -262,6 +283,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   const handlePointerUp = (e: React.PointerEvent) => {
     if (longPressTimerRef.current) {
       clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
     }
 
     const down = pointerDownRef.current;
@@ -273,14 +295,16 @@ export const Chessboard: React.FC<ChessboardProps> = ({
 
     const targetSquare = getSquareFromCoords(e.clientX, e.clientY) || down.square;
 
-    // Check fast double tap / click for trackpad users without right-click
-    const now = Date.now();
-    if (lastTapRef.current && lastTapRef.current.square === targetSquare && now - lastTapRef.current.time < 300) {
-      lastTapRef.current = null;
-      toggleRedSquare(targetSquare);
-      return;
+    // Fast double tap detection ONLY on touch/pen devices
+    if (down.pointerType === 'touch' || down.pointerType === 'pen') {
+      const now = Date.now();
+      if (lastTapRef.current && lastTapRef.current.square === targetSquare && now - lastTapRef.current.time < 300) {
+        lastTapRef.current = null;
+        toggleRedSquare(targetSquare);
+        return;
+      }
+      lastTapRef.current = { square: targetSquare, time: now };
     }
-    lastTapRef.current = { square: targetSquare, time: now };
 
     if (dragState && dragState.hasMoved) {
       setDragState(null);
@@ -322,7 +346,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
           displayFiles.map((file, fIdx) => {
             const square = `${file}${rank}`;
             const isLight = (files.indexOf(file) + parseInt(rank, 10)) % 2 !== 0;
-            const bg = isLight ? themeColors.light : themeColors.dark;
+            const bg = isLight ? 'var(--board-light, #f0d9b5)' : 'var(--board-dark, #b58863)';
 
             const [sourceFileIdx, sourceRankIdx] = getIndicesFromSquare(square);
             const piece = boardMatrix[sourceRankIdx]?.[sourceFileIdx] ?? null;
@@ -345,10 +369,13 @@ export const Chessboard: React.FC<ChessboardProps> = ({
                 onContextMenu={(e) => {
                   e.preventDefault();
                   toggleRedSquare(square);
+                  if (premove && onCancelPremove) {
+                    onCancelPremove();
+                  }
                 }}
                 onPointerDown={(e) => handlePointerDown(e, square, piece)}
                 style={{ backgroundColor: bg }}
-                className="chess-square group relative transition-colors duration-75 select-none"
+                className="chess-square group relative select-none"
               >
                 {/* Premove queued indicator */}
                 {isPremoveSquare && (
@@ -386,7 +413,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
                     {fIdx === 0 && (
                       <span
                         className="absolute top-0.5 left-1 text-[10px] sm:text-xs font-bold opacity-70 pointer-events-none"
-                        style={{ color: isLight ? themeColors.dark : themeColors.light }}
+                        style={{ color: isLight ? 'var(--board-dark, #b58863)' : 'var(--board-light, #f0d9b5)' }}
                       >
                         {rank}
                       </span>
@@ -394,7 +421,7 @@ export const Chessboard: React.FC<ChessboardProps> = ({
                     {rIdx === 7 && (
                       <span
                         className="absolute bottom-0.5 right-1 text-[10px] sm:text-xs font-bold opacity-70 pointer-events-none"
-                        style={{ color: isLight ? themeColors.dark : themeColors.light }}
+                        style={{ color: isLight ? 'var(--board-dark, #b58863)' : 'var(--board-light, #f0d9b5)' }}
                       >
                         {file}
                       </span>
@@ -405,8 +432,8 @@ export const Chessboard: React.FC<ChessboardProps> = ({
                 {/* Chess Piece on board */}
                 {piece && (
                   <div
-                    className={`w-full h-full flex items-center justify-center transition-opacity ${
-                      isBeingDragged ? 'opacity-20' : 'opacity-100'
+                    className={`w-full h-full flex items-center justify-center select-none ${
+                      isBeingDragged ? 'opacity-20 scale-95' : 'opacity-100 scale-100'
                     }`}
                   >
                     <PieceSvg piece={piece} />

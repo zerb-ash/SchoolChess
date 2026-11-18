@@ -7,7 +7,16 @@ export class RoomManager {
     const existing = this.rooms.get(options.gameId);
     if (existing) return existing;
 
-    const newRoom = new GameRoom(options);
+    const newRoom = new GameRoom({
+      ...options,
+      onGameOver: (result, termination, winnerId) => {
+        options.onGameOver?.(result, termination, winnerId);
+        // Automatically cleanup finished game from memory after a 5 second grace window
+        setTimeout(() => {
+          this.removeRoom(options.gameId);
+        }, 5000);
+      },
+    });
     this.rooms.set(options.gameId, newRoom);
     return newRoom;
   }

@@ -300,7 +300,7 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between py-2 border-b border-wood-800">
+          <div className="flex items-center justify-between py-2">
             <div>
               <span className="text-xs font-bold text-parchment-200 block">Auto-Flip When Playing Black</span>
               <span className="text-[11px] text-parchment-400">Automatically orient the board so your pieces are on the bottom</span>
@@ -317,31 +317,6 @@ export default function SettingsPage() {
                 }`}
               />
             </button>
-          </div>
-
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <span className="text-xs font-bold text-parchment-200 block">Piece Animation Speed</span>
-              <span className="text-[11px] text-parchment-400">Transition animation duration for opponent moves and drags</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-wood-950 p-1 rounded-xl border border-wood-800">
-              {(['fast', 'normal', 'instant'] as const).map((spd) => {
-                const isSelected = (settings.animationSpeed || 'normal') === spd;
-                return (
-                  <button
-                    key={spd}
-                    onClick={() => updateSettings({ animationSpeed: spd })}
-                    className={`px-3 py-1 rounded-lg text-xs font-serif font-bold capitalize transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-brass-500/20 text-brass-400 border border-brass-500/40'
-                        : 'text-parchment-400 hover:text-parchment-200'
-                    }`}
-                  >
-                    {spd}
-                  </button>
-                );
-              })}
-            </div>
           </div>
         </div>
       </div>

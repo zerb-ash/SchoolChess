@@ -18,11 +18,21 @@ export const CapturedPieces: React.FC<CapturedPiecesProps> = ({ captured, advant
   return (
     <div className="flex items-center gap-1.5 h-6 text-xs text-zinc-400">
       <div className="flex items-center -space-x-1 overflow-x-auto">
-        {sorted.map((p, idx) => (
-          <div key={idx} className="w-5 h-5 flex-shrink-0">
-            <PieceSvg piece={p} className="w-full h-full" />
-          </div>
-        ))}
+        {sorted.map((p, idx) => {
+          const isBlack = p.startsWith('b');
+          return (
+            <div
+              key={idx}
+              className={`w-5 h-5 flex-shrink-0 ${
+                isBlack
+                  ? 'filter drop-shadow-[0_0_1px_rgba(255,255,255,0.75)] drop-shadow-[0_0_0.5px_rgba(255,255,255,0.9)]'
+                  : ''
+              }`}
+            >
+              <PieceSvg piece={p} className="w-full h-full" />
+            </div>
+          );
+        })}
       </div>
       {advantage > 0 && (
         <span className="font-bold text-zinc-300 text-[11px] ml-1">+{advantage}</span>

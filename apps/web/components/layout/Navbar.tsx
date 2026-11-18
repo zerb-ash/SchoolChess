@@ -5,9 +5,11 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Crown, Play, Swords, Trophy, Settings, LogOut, UserPlus, LogIn, ChevronDown, Bot, User } from 'lucide-react';
 import { useAuth } from '../../lib/useAuth';
+import { usePresence } from '../../lib/usePresence';
 import { AuthModal } from '../auth/AuthModal';
 
 export const Navbar: React.FC = () => {
+  usePresence();
   const pathname = usePathname();
   const { user, logout, loading } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -16,9 +18,9 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { href: '/', label: 'Home', icon: Crown },
-    { href: '/play', label: 'Play Online', icon: Play },
+    { href: '/play', label: 'Play', icon: Play },
     { href: '/play/computer', label: 'Computer', icon: Bot },
-    { href: '/sandbox', label: 'Pass & Play', icon: Swords },
+    { href: '/sandbox', label: 'Sandbox', icon: Swords },
     { href: '/leaderboards', label: 'Leaderboards', icon: Trophy },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
@@ -32,17 +34,21 @@ export const Navbar: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-40 w-full border-b border-wood-800/80 bg-wood-950/90 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-wood-900 border border-brass-500/40 flex items-center justify-center shadow-md group-hover:border-brass-400 transition-colors">
-              <Crown className="w-5 h-5 text-brass-400 group-hover:scale-105 transition-transform" />
-            </div>
-            <span className="font-serif text-lg font-bold tracking-wider text-parchment-100 group-hover:text-brass-300 transition-colors">
-              X<span className="text-brass-400 font-normal">Chess</span>
-            </span>
-          </Link>
+        <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          {/* Far Left: XChess Logo */}
+          <div className="flex items-center justify-start min-w-[160px] sm:min-w-[200px]">
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-lg bg-wood-900 border border-brass-500/40 flex items-center justify-center shadow-md group-hover:border-brass-400 transition-colors p-1.5 overflow-hidden">
+                <img src="/favicon.ico" alt="XChess" className="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+              </div>
+              <span className="font-serif text-lg font-bold tracking-wider text-parchment-100 group-hover:text-brass-300 transition-colors">
+                X<span className="text-brass-400 font-normal">Chess</span>
+              </span>
+            </Link>
+          </div>
 
-          <nav className="hidden md:flex items-center gap-1">
+          {/* Centered Navigation Links */}
+          <nav className="hidden md:flex items-center justify-center flex-1 gap-1">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
@@ -63,7 +69,8 @@ export const Navbar: React.FC = () => {
             })}
           </nav>
 
-          <div className="flex items-center gap-2.5">
+          {/* Far Right: User Auth / Account */}
+          <div className="flex items-center justify-end min-w-[160px] sm:min-w-[200px] gap-2.5">
             {loading ? (
               <div className="w-20 h-7 bg-wood-900 rounded-md animate-pulse" />
             ) : user ? (
@@ -72,12 +79,24 @@ export const Navbar: React.FC = () => {
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-wood-700 bg-wood-900 hover:bg-wood-850 text-xs text-parchment-200 transition-colors cursor-pointer"
                 >
-                  <div className="w-5 h-5 rounded-full bg-brass-600 text-wood-950 font-bold flex items-center justify-center text-[10px]">
-                    {user.username.charAt(0).toUpperCase()}
+                  <div className="relative w-6 h-6 rounded-full overflow-hidden bg-wood-950 border border-brass-500/40 flex items-center justify-center text-[10px] shrink-0">
+                    <span className="font-bold text-brass-400 select-none">
+                      {user.username.charAt(0).toUpperCase()}
+                    </span>
+                    {user.avatarUrl && (
+                      <img
+                        src={user.avatarUrl}
+                        alt={user.username}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
                   </div>
                   <span className="font-medium tracking-wide">{user.username}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-wood-950 border border-wood-800 text-brass-400 font-mono">
-                    {user.ratings?.fide || 1600}
+                    {user.ratings?.fide || 200}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 text-parchment-500" />
                 </button>
