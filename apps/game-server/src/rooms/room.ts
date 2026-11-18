@@ -385,6 +385,7 @@ export class GameRoom {
         result,
         termination,
         winnerId,
+        rated: this.rated,
       },
     });
 
@@ -408,7 +409,27 @@ export class GameRoom {
         finalFen: this.engine.getFen(),
         rated: this.rated,
       }),
-    }).catch(() => {});
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as any;
+          this.broadcast({
+            type: 'game:over',
+            payload: {
+              gameId: this.gameId,
+              result,
+              termination,
+              winnerId,
+              rated: data.rated,
+              ratingUpdates: {
+                white: data.whiteRatingUpdates,
+                black: data.blackRatingUpdates,
+              },
+            },
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   public getStatePayload() {

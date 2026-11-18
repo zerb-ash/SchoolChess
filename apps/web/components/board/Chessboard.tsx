@@ -195,6 +195,13 @@ export const Chessboard: React.FC<ChessboardProps> = ({
   const handleTapSquare = (square: string) => {
     if (disabled || pendingPromotion || !square) return;
 
+    // Clicking the piece just premoved (or its premove destination) cancels the premove
+    if (premove && onCancelPremove && (square === premove.from || square === premove.to)) {
+      onCancelPremove();
+      setSelectedSquare(null);
+      return;
+    }
+
     const [fileIdx, rankIdx] = getIndicesFromSquare(square);
     const piece = boardMatrix[rankIdx]?.[fileIdx] ?? null;
 
@@ -315,6 +322,9 @@ export const Chessboard: React.FC<ChessboardProps> = ({
           setSelectedSquare(null);
         }
       } else {
+        if (premove && onCancelPremove && (dragState.fromSquare === premove.from || dragState.fromSquare === premove.to)) {
+          onCancelPremove();
+        }
         setSelectedSquare(null);
       }
     } else {

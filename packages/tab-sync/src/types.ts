@@ -13,7 +13,7 @@ export type TabIpcMessage =
   | { type: 'SERVER_MOVE_APPLIED'; payload: MoveAppliedEvent }
   | { type: 'SERVER_GAME_STATE'; payload: GameStateEvent }
   | { type: 'SERVER_MOVE_REJECTED'; payload: { expectedMoveNumber: number; errorCode: string; currentFen: string } }
-  | { type: 'SERVER_GAME_OVER'; payload: { gameId: string; result: string; termination: string; winnerId?: string } }
+  | { type: 'SERVER_GAME_OVER'; payload: { gameId: string; result: string; termination: string; winnerId?: string; rated?: boolean; ratingUpdates?: any; completed?: boolean } }
   | { type: 'SERVER_DRAW_OFFERED'; payload: { fromColor: 'w' | 'b' } }
   | { type: 'SERVER_DRAW_DECLINED'; payload: { byColor: 'w' | 'b' } }
   | { type: 'SERVER_PRESENCE'; payload: { whiteConnected: boolean; blackConnected: boolean } }
@@ -29,7 +29,7 @@ export interface TabSyncOptions {
   onStateUpdate?: (state: GameStateEvent) => void;
   onMoveApplied?: (move: MoveAppliedEvent) => void;
   onMoveRejected?: (error: { expectedMoveNumber: number; errorCode: string; currentFen: string }) => void;
-  onGameOver?: (data: { gameId: string; result: string; termination: string; winnerId?: string }) => void;
+  onGameOver?: (data: { gameId: string; result: string; termination: string; winnerId?: string; rated?: boolean; ratingUpdates?: any; completed?: boolean }) => void;
   onDrawOffered?: (data: { fromColor: 'w' | 'b' }) => void;
   onDrawDeclined?: (data: { byColor: 'w' | 'b' }) => void;
   onPresenceChange?: (data: { whiteConnected: boolean; blackConnected: boolean }) => void;

@@ -26,6 +26,38 @@ function getCategoryFromTimeControl(tc?: string): 'bullet' | 'blitz' | 'rapid' |
   return 'classical';
 }
 
+function formatDuration(sec: number): string {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTermination(termination?: string): string {
+  switch (termination?.toLowerCase()) {
+    case 'checkmate':
+      return 'Checkmate';
+    case 'resignation':
+      return 'Resignation';
+    case 'timeout':
+      return 'Timeout';
+    case 'stalemate':
+      return 'Stalemate';
+    case 'draw_agreement':
+      return 'Mutual Agreement';
+    case 'repetition':
+      return '3-fold Repetition';
+    case 'insufficient_material':
+      return 'Insufficient Material';
+    case 'fifty_moves':
+      return '50-Move Rule';
+    case 'aborted':
+    case 'abandoned':
+      return 'Match Aborted';
+    default:
+      return termination ? termination.charAt(0).toUpperCase() + termination.slice(1) : 'Game Ended';
+  }
+}
+
 function LiveGameContent() {
   const router = useRouter();
   const params = useParams();
@@ -71,7 +103,20 @@ function LiveGameContent() {
   const [whiteClockMs, setWhiteClockMs] = useState(300000);
   const [blackClockMs, setBlackClockMs] = useState(300000);
   const [isConnected, setIsConnected] = useState(false);
-  const [gameOverData, setGameOverData] = useState<{ result: string; termination: string; winnerId?: string; completed?: boolean } | null>(null);
+  const [gameOverData, setGameOverData] = useState<{
+    result: string;
+    termination: string;
+    winnerId?: string;
+    completed?: boolean;
+    rated?: boolean;
+    ratingUpdates?: {
+      white?: { fide?: number; chess_com?: number; lichess?: number };
+      black?: { fide?: number; chess_com?: number; lichess?: number };
+    };
+  } | null>(null);
+  const matchStartTimeRef = useRef<number>(Date.now());
+  const [matchDurationSeconds, setMatchDurationSeconds] = useState<number>(0);
+  const startingRatingRef = useRef<number | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState<number | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
   const [drawOfferedByOpponent, setDrawOfferedByOpponent] = useState(false);
@@ -215,9 +260,19 @@ function LiveGameContent() {
         setMoveNumber(err.expectedMoveNumber);
       },
       onGameOver: (data) => {
-        setGameOverData(data);
+        setGameOverData((prev) => ({
+          ...prev,
+          ...data,
+          ratingUpdates: data.ratingUpdates || prev?.ratingUpdates,
+        }));
         soundSystem.playGameOver();
         setRedirectCountdown((prev) => (prev !== null ? prev : 10));
+
+        if (matchStartTimeRef.current) {
+          const duration = Math.max(1, Math.floor((Date.now() - matchStartTimeRef.current) / 1000));
+          setMatchDurationSeconds(duration);
+        }
+
         setTimeout(() => {
           refreshUser();
         }, 1000);
@@ -556,6 +611,19 @@ function LiveGameContent() {
     200;
 
   useEffect(() => {
+    if (myFideModeRating > 0 && startingRatingRef.current === null) {
+      startingRatingRef.current = myFideModeRating;
+    }
+  }, [myFideModeRating]);
+
+  useEffect(() => {
+    if (isGameOver && matchDurationSeconds === 0 && matchStartTimeRef.current) {
+      const duration = Math.max(1, Math.floor((Date.now() - matchStartTimeRef.current) / 1000));
+      setMatchDurationSeconds(duration);
+    }
+  }, [isGameOver, matchDurationSeconds]);
+
+  useEffect(() => {
     const opp = isTopMe ? bottomPlayer : isBottomMe ? topPlayer : null;
     if (
       opp &&
@@ -606,6 +674,34 @@ function LiveGameContent() {
 
   const topPlayerLabel = formatPlayerDisplay(topPlayer, isTopMe);
   const bottomPlayerLabel = formatPlayerDisplay(bottomPlayer, isBottomMe);
+
+  const isWhiteWinner = gameOverData?.result === '1-0';
+  const isBlackWinner = gameOverData?.result === '0-1';
+  const isDraw =
+    gameOverData?.result === '1/2-1/2' ||
+    gameOverData?.termination === 'stalemate' ||
+    gameOverData?.termination === 'draw_agreement' ||
+    gameOverData?.termination === 'repetition' ||
+    gameOverData?.termination === 'insufficient_material' ||
+    gameOverData?.termination === 'fifty_moves';
+  const isAborted =
+    gameOverData?.result === '*' ||
+    gameOverData?.termination === 'aborted' ||
+    gameOverData?.termination === 'abandoned';
+
+  const isMyWin = (myColor === 'w' && isWhiteWinner) || (myColor === 'b' && isBlackWinner);
+  const isMyLoss = (myColor === 'w' && isBlackWinner) || (myColor === 'b' && isWhiteWinner);
+
+  const displayOldElo = startingRatingRef.current || myFideModeRating || 200;
+  let displayNewElo = displayOldElo;
+  if (myColor === 'w' && gameOverData?.ratingUpdates?.white?.fide) {
+    displayNewElo = gameOverData.ratingUpdates.white.fide;
+  } else if (myColor === 'b' && gameOverData?.ratingUpdates?.black?.fide) {
+    displayNewElo = gameOverData.ratingUpdates.black.fide;
+  } else if (user?.ratings?.byCategory?.[activeCategory]?.fide && user.ratings.byCategory[activeCategory].fide !== displayOldElo) {
+    displayNewElo = user.ratings.byCategory[activeCategory].fide;
+  }
+  const displayDelta = displayNewElo - displayOldElo;
 
   // Sync active match state to localStorage for multi-tab dock
   useEffect(() => {
@@ -783,6 +879,140 @@ function LiveGameContent() {
               </div>
             </div>
           )}
+
+          {/* On-Board Modern Match End Modal */}
+          {isGameOver && (
+            <div className="absolute inset-0 z-30 rounded-2xl bg-black/60 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4 select-none animate-fadeIn">
+              <div className="relative bg-wood-950/95 border border-brass-500/50 backdrop-blur-xl rounded-2xl p-5 sm:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.85),0_0_35px_rgba(197,168,88,0.2)] flex flex-col items-center gap-3.5 max-w-[310px] sm:max-w-[350px] w-full text-center border-t-brass-400/80 animate-in zoom-in-95 duration-150">
+                {/* Header Tag */}
+                <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-wood-900 border border-brass-500/30">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-brass-400 font-bold">
+                    Match Has Ended
+                  </span>
+                </div>
+
+                {/* Outcome Heading */}
+                <div className="flex flex-col items-center gap-1">
+                  {isAborted ? (
+                    <>
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-parchment-200 flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-400" />
+                        <span>Match Aborted</span>
+                      </div>
+                      <span className="text-xs text-parchment-400">Game ended before completion</span>
+                    </>
+                  ) : isDraw ? (
+                    <>
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-parchment-100 flex items-center gap-2">
+                        <Handshake className="w-5 h-5 text-brass-300" />
+                        <span>Draw</span>
+                      </div>
+                      <span className="text-xs text-parchment-400">
+                        by {formatTermination(gameOverData?.termination || 'draw')}
+                      </span>
+                    </>
+                  ) : isMyWin ? (
+                    <>
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-brass-300 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-brass-400" />
+                        <span>Victory!</span>
+                      </div>
+                      <span className="text-xs text-parchment-400">
+                        by {formatTermination(gameOverData?.termination || 'resignation')}
+                      </span>
+                    </>
+                  ) : isMyLoss ? (
+                    <>
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-rose-400 flex items-center gap-2">
+                        <Flag className="w-5 h-5 text-rose-400" />
+                        <span>Defeat</span>
+                      </div>
+                      <span className="text-xs text-parchment-400">
+                        by {formatTermination(gameOverData?.termination || 'resignation')}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-xl sm:text-2xl font-serif font-bold text-parchment-100">
+                        {isWhiteWinner ? 'White Wins' : isBlackWinner ? 'Black Wins' : 'Game Over'}
+                      </div>
+                      <span className="text-xs text-parchment-400">
+                        by {formatTermination(gameOverData?.termination || 'game over')}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                {/* Total Moves & Duration */}
+                <div className="grid grid-cols-2 gap-2 w-full mt-0.5">
+                  <div className="bg-wood-900/90 border border-wood-800 rounded-xl p-2.5 flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-parchment-400">
+                      Total Moves
+                    </span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-parchment-100 mt-0.5">
+                      {Math.ceil(moveHistory.length / 2)}{' '}
+                      <span className="text-[10px] text-parchment-400 font-sans font-normal">
+                        ({moveHistory.length} ply)
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="bg-wood-900/90 border border-wood-800 rounded-xl p-2.5 flex flex-col items-center">
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-parchment-400">
+                      Duration
+                    </span>
+                    <span className="text-sm sm:text-base font-mono font-bold text-parchment-100 mt-0.5">
+                      {formatDuration(matchDurationSeconds)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rating Change Card */}
+                <div className="w-full bg-wood-900/90 border border-brass-500/30 rounded-xl p-2.5 flex flex-col items-center gap-1 shadow-inner">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-parchment-400">
+                    Rating Change ({activeCategory.toUpperCase()})
+                  </span>
+                  <div className="flex items-center gap-2 font-mono font-bold text-sm sm:text-base">
+                    <span className="text-parchment-300">{displayOldElo}</span>
+                    <span
+                      className={
+                        displayDelta > 0
+                          ? 'text-emerald-400'
+                          : displayDelta < 0
+                          ? 'text-rose-400'
+                          : 'text-parchment-400'
+                      }
+                    >
+                      {displayDelta >= 0 ? `+ ${displayDelta}` : `- ${Math.abs(displayDelta)}`}
+                    </span>
+                    <span className="text-brass-400 font-sans">→</span>
+                    <span className="text-brass-300 text-base sm:text-lg">{displayNewElo}</span>
+                  </div>
+                  {(!gameOverData?.rated || isAborted) && (
+                    <span className="text-[10px] text-parchment-500 font-mono">
+                      (Unrated or Aborted)
+                    </span>
+                  )}
+                </div>
+
+                {/* Back to Lobby Button */}
+                <button
+                  onClick={() => router.push('/play')}
+                  className="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-brass-600 to-brass-500 hover:from-brass-500 hover:to-brass-400 active:scale-95 text-wood-950 font-serif font-bold text-xs uppercase tracking-wider transition-all shadow-[0_0_20px_rgba(197,168,88,0.3)] flex items-center justify-center gap-2 cursor-pointer mt-0.5"
+                >
+                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Back to Lobby</span>
+                </button>
+
+                {/* Countdown Indicator */}
+                {redirectCountdown !== null && (
+                  <span className="text-[10px] text-parchment-400 font-mono">
+                    Returning to lobby in <strong className="text-brass-400">{redirectCountdown}</strong>s...
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Bottom Player (You) */}
@@ -852,30 +1082,7 @@ function LiveGameContent() {
           </div>
         )}
 
-        {/* Game Over Banner */}
-        {gameOverData && (
-          <div className="w-full mt-4 p-4 rounded-xl bg-wood-900 border border-brass-500/40 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn shadow-2xl">
-            <div className="flex items-center gap-3">
-              <Trophy className="w-5 h-5 text-brass-400 shrink-0" />
-              <div className="text-left">
-                <div className="font-serif font-bold text-parchment-100 text-sm">
-                  Game Over: {gameOverData.result} ({gameOverData.termination})
-                </div>
-                {redirectCountdown !== null && (
-                  <div className="text-xs text-parchment-400 mt-0.5 font-sans">
-                    Returning to lobby in <span className="text-brass-400 font-bold font-mono">{redirectCountdown}</span>s...
-                  </div>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={() => router.push('/play')}
-              className="px-4 py-2 rounded-lg bg-brass-600 hover:bg-brass-500 text-wood-950 font-bold text-xs shadow-md transition-colors cursor-pointer shrink-0"
-            >
-              Return to Play
-            </button>
-          </div>
-        )}
+
       </div>
 
       {/* Right Column: Move History & In-game controls */}
