@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from '../../../components/board/Chessboard';
+import { CapturedPieces } from '../../../components/board/CapturedPieces';
 import { EvaluationBar } from '../../../components/board/EvaluationBar';
+import { computeCapturedPieces } from '../../../lib/chessCaptured';
 import { useAppSettings } from '../../../lib/useSettings';
 import { soundSystem } from '../../../lib/audio';
 import { computeBotMove, evaluatePosition, PositionEvaluation } from '@schoolchess/chess-core';
@@ -43,6 +45,10 @@ export default function PlayComputerPage() {
   const turn = chess.turn();
   const isCheck = chess.inCheck();
   const isPlayerTurn = (playerSide === 'white' && turn === 'w') || (playerSide === 'black' && turn === 'b');
+
+  const { whiteCaptured, blackCaptured, whiteAdvantage, blackAdvantage } = useMemo(() => {
+    return computeCapturedPieces(fen);
+  }, [fen]);
 
   // Sync orientation with playerSide unless manually flipped
   useEffect(() => {
@@ -267,6 +273,10 @@ export default function PlayComputerPage() {
             <span className="text-xs font-serif font-bold text-parchment-300">
               {topLabel}
             </span>
+            <CapturedPieces
+              captured={topColor === 'white' ? whiteCaptured : blackCaptured}
+              advantage={topColor === 'white' ? whiteAdvantage : blackAdvantage}
+            />
             {isBotThinking && !isTopPlayer && (
               <span className="text-[10px] text-brass-400 animate-pulse font-mono flex items-center gap-1">
                 <Bot className="w-3 h-3" />
@@ -323,6 +333,10 @@ export default function PlayComputerPage() {
             <span className="text-xs font-serif font-bold text-parchment-100">
               {bottomLabel}
             </span>
+            <CapturedPieces
+              captured={bottomColor === 'white' ? whiteCaptured : blackCaptured}
+              advantage={bottomColor === 'white' ? whiteAdvantage : blackAdvantage}
+            />
             {turn === (bottomColor === 'white' ? 'w' : 'b') && !gameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
             )}

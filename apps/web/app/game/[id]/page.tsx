@@ -4,13 +4,27 @@ import React, { useEffect, useState, useMemo, useRef, Suspense } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Chess } from 'chess.js';
 import { Chessboard } from '../../../components/board/Chessboard';
+import { CapturedPieces } from '../../../components/board/CapturedPieces';
+import { computeCapturedPieces } from '../../../lib/chessCaptured';
+import { getClientPlayerId, getClientPlayerUsername } from '../../../lib/guestPlayer';
 import { useAppSettings } from '../../../lib/useSettings';
 import { useAuth } from '../../../lib/useAuth';
 import { soundSystem } from '../../../lib/audio';
-import { getWsBaseUrl } from '../../../lib/config';
+import { getWsBaseUrl, getApiBaseUrl } from '../../../lib/config';
 import { TabSocketManager } from '@schoolchess/tab-sync';
-import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, AlertTriangle } from 'lucide-react';
+import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, AlertTriangle, CheckCircle2, XCircle, ArrowRight, Check, X } from 'lucide-react';
 import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
+
+const API_BASE = getApiBaseUrl();
+
+function getCategoryFromTimeControl(tc?: string): 'bullet' | 'blitz' | 'rapid' | 'classical' {
+  if (!tc) return 'blitz';
+  const baseMinutes = parseInt(tc.split('+')[0], 10) || 5;
+  if (baseMinutes <= 2) return 'bullet';
+  if (baseMinutes <= 5) return 'blitz';
+  if (baseMinutes <= 30) return 'rapid';
+  return 'classical';
+}
 
 function LiveGameContent() {
   const router = useRouter();
@@ -20,29 +34,28 @@ function LiveGameContent() {
   const colorParam = searchParams?.get('color') as 'white' | 'black' | null;
 
   const { themeColors, settings } = useAppSettings();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
 
+  const urlPlayerId = searchParams?.get('playerId');
   const [clientSessionId] = useState(() => {
-    if (typeof window === 'undefined') return 'guest_' + Math.random().toString(36).substring(2, 8);
-    const colorHint = colorParam ? `_${colorParam}` : '';
-    return 'guest' + colorHint + '_' + Math.random().toString(36).substring(2, 8);
+    return urlPlayerId || getClientPlayerId(user?.id);
   });
 
-  const effectiveUserId = user ? user.id : clientSessionId;
+  const effectiveUserId = user ? user.id : urlPlayerId || clientSessionId;
   const effectiveUsername = user
     ? user.username
-    : colorParam
-    ? `Guest (${colorParam === 'white' ? 'White' : 'Black'})`
-    : `Guest ${clientSessionId.substring(clientSessionId.length - 4)}`;
+    : getClientPlayerUsername(undefined, colorParam);
 
   const [chess] = useState(() => new Chess());
   const [fen, setFen] = useState(() => chess.fen());
   const [orientation, setOrientation] = useState<'white' | 'black'>(() => (colorParam === 'black' ? 'black' : 'white'));
   const [myColor, setMyColor] = useState<'w' | 'b' | null>(() => (colorParam === 'black' ? 'b' : colorParam === 'white' ? 'w' : null));
   const [players, setPlayers] = useState<{
-    white?: { id: string; username: string };
-    black?: { id: string; username: string };
+    white?: { id: string; username: string; rating?: number };
+    black?: { id: string; username: string; rating?: number };
   }>({});
+  const [gameTimeControl, setGameTimeControl] = useState<string>(searchParams?.get('timeControl') || '5+0');
+  const [opponentRatings, setOpponentRatings] = useState<Record<string, number>>({});
 
   const [lastMove, setLastMove] = useState<{ from: string; to: string } | null>(null);
   const [premove, setPremove] = useState<{ from: string; to: string; promotion?: 'q' | 'r' | 'b' | 'n' } | null>(null);
@@ -64,6 +77,13 @@ function LiveGameContent() {
   const [drawOfferedByOpponent, setDrawOfferedByOpponent] = useState(false);
   const [drawOfferNotice, setDrawOfferNotice] = useState<string | null>(null);
   const [tabRole, setTabRole] = useState<'leader' | 'candidate'>('candidate');
+  const [pendingConfirmMove, setPendingConfirmMove] = useState<{
+    from: string;
+    to: string;
+    promotion?: 'q' | 'r' | 'b' | 'n';
+    san?: string;
+    piece?: string;
+  } | null>(null);
 
   const tabSocketRef = useRef<TabSocketManager | null>(null);
   const moveNumberRef = useRef(0);
@@ -100,6 +120,9 @@ function LiveGameContent() {
         }
 
         setPlayers({ white: state.white, black: state.black });
+        if ((state as any).timeControl) {
+          setGameTimeControl((state as any).timeControl);
+        }
 
         const isWhite =
           state.white &&
@@ -195,6 +218,9 @@ function LiveGameContent() {
         setGameOverData(data);
         soundSystem.playGameOver();
         setRedirectCountdown((prev) => (prev !== null ? prev : 10));
+        setTimeout(() => {
+          refreshUser();
+        }, 1000);
       },
       onDrawOffered: (data) => {
         if (myColor && data.fromColor !== myColor) {
@@ -219,7 +245,9 @@ function LiveGameContent() {
 
     tabSocketRef.current = manager;
     const timeControlParam = searchParams.get('timeControl') || undefined;
-    manager.joinGame(gameId, colorParam || undefined, timeControlParam);
+    const activeCat = getCategoryFromTimeControl(timeControlParam || gameTimeControl);
+    const myRating = user?.ratings?.byCategory?.[activeCat]?.fide ?? user?.ratings?.fide ?? 200;
+    manager.joinGame(gameId, colorParam || undefined, timeControlParam, myRating);
 
     return () => {
       manager.disconnect();
@@ -367,15 +395,7 @@ function LiveGameContent() {
     return moves.map((m) => m.to);
   };
 
-  const handleMakeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
-    if (isGameOver) return;
-    if (myColor && myColor !== turn) {
-      if (settings.enablePremoves) {
-        setPremove({ from, to, promotion: promotion || 'q' });
-      }
-      return;
-    }
-
+  const executeConfirmedMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
     if (tabSocketRef.current) {
       tabSocketRef.current.sendMove({
         gameId,
@@ -387,6 +407,58 @@ function LiveGameContent() {
       });
     }
   };
+
+  const handleMakeMove = (from: string, to: string, promotion?: 'q' | 'r' | 'b' | 'n') => {
+    if (isGameOver) return;
+    if (myColor && myColor !== turn) {
+      if (settings.enablePremoves) {
+        setPremove({ from, to, promotion: promotion || 'q' });
+      }
+      return;
+    }
+
+    if (settings.confirmMove) {
+      let san = `${from} → ${to}`;
+      let pieceType = '';
+      try {
+        const piece = chess.get(from as any);
+        if (piece) {
+          const names: Record<string, string> = { p: 'Pawn', n: 'Knight', b: 'Bishop', r: 'Rook', q: 'Queen', k: 'King' };
+          pieceType = names[piece.type] || piece.type.toUpperCase();
+        }
+        const tempChess = new Chess(chess.fen());
+        const moveRes = tempChess.move({ from, to, promotion: promotion || 'q' });
+        if (moveRes) san = moveRes.san;
+      } catch {}
+
+      setPendingConfirmMove({ from, to, promotion, san, piece: pieceType });
+      return;
+    }
+
+    executeConfirmedMove(from, to, promotion);
+  };
+
+  useEffect(() => {
+    if (!pendingConfirmMove) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        executeConfirmedMove(pendingConfirmMove.from, pendingConfirmMove.to, pendingConfirmMove.promotion);
+        setPendingConfirmMove(null);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setPendingConfirmMove(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [pendingConfirmMove]);
+
+  useEffect(() => {
+    if (isGameOver && pendingConfirmMove) {
+      setPendingConfirmMove(null);
+    }
+  }, [isGameOver, pendingConfirmMove]);
 
   const handleResign = () => {
     if (!confirmResign) {
@@ -477,10 +549,41 @@ function LiveGameContent() {
   const isBottomMe = myColor !== null && myColor === (bottomColor === 'white' ? 'w' : 'b');
   const isSpectator = myColor === null;
 
+  const activeCategory = getCategoryFromTimeControl(gameTimeControl);
+  const myFideModeRating =
+    user?.ratings?.byCategory?.[activeCategory]?.fide ??
+    user?.ratings?.fide ??
+    200;
+
+  useEffect(() => {
+    const opp = isTopMe ? bottomPlayer : isBottomMe ? topPlayer : null;
+    if (
+      opp &&
+      opp.username &&
+      !opp.username.startsWith('Guest') &&
+      !opp.id?.startsWith('guest_') &&
+      !opp.id?.startsWith('anon_') &&
+      opp.username !== 'Waiting...'
+    ) {
+      if (!opponentRatings[opp.username]) {
+        fetch(`${API_BASE}/api/v1/users/${opp.username}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            if (d?.ratings?.[activeCategory]) {
+              setOpponentRatings((prev) => ({ ...prev, [opp.username]: d.ratings[activeCategory] }));
+            } else if (d?.byCategory?.[activeCategory]?.fide) {
+              setOpponentRatings((prev) => ({ ...prev, [opp.username]: d.byCategory[activeCategory].fide }));
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [players.white?.username, players.black?.username, isTopMe, isBottomMe, activeCategory, opponentRatings]);
+
   const formatPlayerDisplay = (player?: { id: string; username: string; rating?: number }, isMe = false) => {
     if (isMe) {
-      const myRating = player?.rating && player.rating > 0 ? ` (${player.rating})` : user?.ratings?.fide ? ` (${user.ratings.fide})` : user ? ' (200)' : '';
-      return `You${myRating}`;
+      const myRating = (player?.rating && player.rating > 0 ? player.rating : undefined) ?? myFideModeRating;
+      return `You (${myRating})`;
     }
 
     if (
@@ -494,8 +597,11 @@ function LiveGameContent() {
       return 'Opponent';
     }
 
-    const ratingStr = player.rating && player.rating > 0 ? ` (${player.rating})` : '';
-    return `${player.username}${ratingStr}`;
+    const oppRating =
+      opponentRatings[player.username] ??
+      (player.rating && player.rating > 0 ? player.rating : undefined) ??
+      200;
+    return `${player.username} (${oppRating})`;
   };
 
   const topPlayerLabel = formatPlayerDisplay(topPlayer, isTopMe);
@@ -538,6 +644,30 @@ function LiveGameContent() {
   const topClockMs = topColor === 'white' ? whiteClockMs : blackClockMs;
   const bottomClockMs = bottomColor === 'white' ? whiteClockMs : blackClockMs;
 
+  const { whiteCaptured, blackCaptured, whiteAdvantage, blackAdvantage } = useMemo(() => {
+    return computeCapturedPieces(fen);
+  }, [fen]);
+
+  const { displayFen, displayLastMove } = useMemo(() => {
+    if (!pendingConfirmMove) {
+      return { displayFen: fen, displayLastMove: lastMove };
+    }
+    try {
+      const tempChess = new Chess(fen);
+      tempChess.move({
+        from: pendingConfirmMove.from,
+        to: pendingConfirmMove.to,
+        promotion: pendingConfirmMove.promotion || 'q',
+      });
+      return {
+        displayFen: tempChess.fen(),
+        displayLastMove: { from: pendingConfirmMove.from, to: pendingConfirmMove.to },
+      };
+    } catch {
+      return { displayFen: fen, displayLastMove: lastMove };
+    }
+  }, [fen, lastMove, pendingConfirmMove]);
+
   const isMyTurn = myColor !== null && myColor === turn;
 
   return (
@@ -562,6 +692,10 @@ function LiveGameContent() {
               <span>{topPlayerLabel}</span>
               {isOwner(topPlayer?.username) && <OwnerBadge size="xs" />}
             </span>
+            <CapturedPieces
+              captured={topColor === 'white' ? whiteCaptured : blackCaptured}
+              advantage={topColor === 'white' ? whiteAdvantage : blackAdvantage}
+            />
             {turn === (topColor === 'white' ? 'w' : 'b') && !isGameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
             )}
@@ -573,25 +707,83 @@ function LiveGameContent() {
           </div>
         </div>
 
-        {/* Board */}
-        <Chessboard
-          fen={fen}
-          orientation={orientation}
-          themeColors={themeColors}
-          showCoordinates={settings.showCoordinates}
-          highlightLastMove={settings.highlightLastMove}
-          highlightLegalMoves={settings.highlightLegalMoves}
-          lastMove={lastMove}
-          premove={premove}
-          isCheck={isCheck}
-          turn={turn}
-          myColor={myColor || undefined}
-          autoQueen={settings.autoQueenPromotion}
-          onMakeMove={handleMakeMove}
-          onCancelPremove={() => setPremove(null)}
-          getLegalMovesForSquare={getLegalMovesForSquare}
-          disabled={isGameOver || (!isMyTurn && !settings.enablePremoves)}
-        />
+        {/* Board Container */}
+        <div className="relative w-full aspect-square">
+          <Chessboard
+            fen={displayFen}
+            orientation={orientation}
+            themeColors={themeColors}
+            showCoordinates={settings.showCoordinates}
+            highlightLastMove={settings.highlightLastMove}
+            highlightLegalMoves={settings.highlightLegalMoves && !pendingConfirmMove}
+            lastMove={displayLastMove}
+            premove={premove}
+            isCheck={isCheck}
+            turn={turn}
+            myColor={myColor || undefined}
+            autoQueen={settings.autoQueenPromotion}
+            onMakeMove={handleMakeMove}
+            onCancelPremove={() => setPremove(null)}
+            getLegalMovesForSquare={getLegalMovesForSquare}
+            disabled={isGameOver || (!isMyTurn && !settings.enablePremoves) || !!pendingConfirmMove}
+          />
+
+          {/* On-Board Modern Move Confirmation Modal */}
+          {pendingConfirmMove && !isGameOver && (
+            <div className="absolute inset-0 z-30 rounded-2xl bg-black/40 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4 select-none animate-fadeIn">
+              <div className="relative bg-wood-950/90 border border-brass-500/50 backdrop-blur-xl rounded-2xl px-5 py-4 sm:px-6 sm:py-5 shadow-[0_20px_50px_rgba(0,0,0,0.8),0_0_30px_rgba(197,168,88,0.15)] flex flex-col items-center gap-3.5 max-w-[280px] sm:max-w-[320px] w-full text-center border-t-brass-400/60 animate-in zoom-in-95 duration-150">
+                <span className="text-[10px] uppercase font-mono tracking-widest text-brass-400 font-bold">
+                  Confirm Move
+                </span>
+
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-sm sm:text-base font-serif font-bold text-parchment-100 flex items-center gap-1.5 flex-wrap justify-center">
+                    <span>{pendingConfirmMove.piece || 'Piece'}</span>
+                    <span className="text-parchment-400 font-normal">from</span>
+                    <span className="font-mono font-bold text-brass-300 px-1.5 py-0.5 rounded bg-wood-900 border border-wood-700/80 text-xs sm:text-sm">
+                      {pendingConfirmMove.from.toUpperCase()}
+                    </span>
+                    <span className="text-parchment-400 font-normal">to</span>
+                    <span className="font-mono font-bold text-brass-300 px-1.5 py-0.5 rounded bg-wood-900 border border-wood-700/80 text-xs sm:text-sm">
+                      {pendingConfirmMove.to.toUpperCase()}
+                    </span>
+                  </span>
+                  {pendingConfirmMove.san && (
+                    <span className="text-xs font-mono text-parchment-300">
+                      Notation: <strong className="text-parchment-100">{pendingConfirmMove.san}</strong>
+                      {pendingConfirmMove.promotion && ` (= ${pendingConfirmMove.promotion.toUpperCase()})`}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2.5 w-full mt-0.5">
+                  <button
+                    onClick={() => setPendingConfirmMove(null)}
+                    className="flex-1 py-2 px-3 rounded-xl bg-wood-900 hover:bg-wood-850 active:scale-95 text-parchment-300 hover:text-parchment-100 border border-wood-700/80 font-serif text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm"
+                  >
+                    <X className="w-3.5 h-3.5 text-parchment-400" />
+                    <span>Cancel</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      executeConfirmedMove(pendingConfirmMove.from, pendingConfirmMove.to, pendingConfirmMove.promotion);
+                      setPendingConfirmMove(null);
+                    }}
+                    className="flex-1 py-2 px-3 rounded-xl bg-brass-600 hover:bg-brass-500 active:scale-95 text-wood-950 font-serif text-xs font-bold transition-all shadow-[0_0_15px_rgba(197,168,88,0.3)] flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Confirm</span>
+                  </button>
+                </div>
+
+                <span className="text-[10px] text-parchment-500 font-mono">
+                  Enter ↵ to confirm • Esc to cancel
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Bottom Player (You) */}
         <div className="w-full flex items-center justify-between mt-1.5 sm:mt-2 px-1">
@@ -605,6 +797,10 @@ function LiveGameContent() {
               <span>{bottomPlayerLabel}</span>
               {(isOwner(bottomPlayer?.username) || (isBottomMe && isOwner(user?.username))) && <OwnerBadge size="xs" />}
             </span>
+            <CapturedPieces
+              captured={bottomColor === 'white' ? whiteCaptured : blackCaptured}
+              advantage={bottomColor === 'white' ? whiteAdvantage : blackAdvantage}
+            />
             {isMyTurn && !isGameOver && (
               <span className="w-2 h-2 rounded-full bg-brass-400 animate-ping" />
             )}

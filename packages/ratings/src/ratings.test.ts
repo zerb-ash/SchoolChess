@@ -23,14 +23,14 @@ test('FIDE Elo - provisional player has K=40', () => {
   assert.equal(result.isProvisional, true);
 });
 
-test('FIDE Elo - rating floor is respected at 1400', () => {
-  const playerA = { rating: 1402, gamesPlayed: 50 };
-  const playerB = { rating: 1402, gamesPlayed: 50 };
+test('FIDE Elo - rating floor is respected at 100', () => {
+  const playerA = { rating: 102, gamesPlayed: 50 };
+  const playerB = { rating: 102, gamesPlayed: 50 };
 
   // Loss (0.0) against equal opponent -> delta = 20 * (0 - 0.5) = -10
-  // 1402 - 10 = 1392, which should clamp to 1400
+  // 102 - 10 = 92, which should clamp to 100
   const result = calculateFideElo(playerA, playerB, 0.0);
-  assert.equal(result.newRating, 1400); // Clamped to floor
+  assert.equal(result.newRating, 100); // Clamped to floor
   assert.equal(result.ratingDelta, -2); // Only dropped by 2
 });
 

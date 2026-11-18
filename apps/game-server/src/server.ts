@@ -96,6 +96,8 @@ export function buildGameServer() {
       (req.query as any)?.username ||
       parsedUrl.searchParams.get('username') ||
       (authenticatedUserId.startsWith('guest_') ? 'Guest' : 'Player');
+    const userRatingParam =
+      parseInt((req.query as any)?.rating || parsedUrl.searchParams.get('rating') || '0', 10) || 0;
     let messageCountInWindow = 0;
     let windowStart = Date.now();
 
@@ -120,6 +122,7 @@ export function buildGameServer() {
               const parse = GameJoinSchema.safeParse(msg.payload);
               if (!parse.success) return;
               const { gameId, preferredColor, timeControl } = parse.data;
+              const joinRating = (parse.data as any).rating || userRatingParam || 200;
 
               activeGameId = gameId;
 
@@ -153,9 +156,9 @@ export function buildGameServer() {
                   gameId,
                   white: firstPlayerIsBlack
                     ? { id: '', username: 'Waiting...', rating: 200 }
-                    : { id: authenticatedUserId, username: authenticatedUsername, rating: 200 },
+                    : { id: authenticatedUserId, username: authenticatedUsername, rating: joinRating },
                   black: firstPlayerIsBlack
-                    ? { id: authenticatedUserId, username: authenticatedUsername, rating: 200 }
+                    ? { id: authenticatedUserId, username: authenticatedUsername, rating: joinRating }
                     : { id: '', username: 'Waiting...', rating: 200 },
                   baseTimeSeconds,
                   incrementSeconds,
@@ -197,13 +200,17 @@ export function buildGameServer() {
 
                 // If both players are seated: seats are permanently locked
                 if (room.isBothSeated()) {
-                  const isWhite = room.white.id === authenticatedUserId;
-                  const isBlack = room.black.id === authenticatedUserId;
+                  const isWhite =
+                    room.white.id === authenticatedUserId ||
+                    (authenticatedUsername && room.white.username && authenticatedUsername.toLowerCase() === room.white.username.toLowerCase());
+                  const isBlack =
+                    room.black.id === authenticatedUserId ||
+                    (authenticatedUsername && room.black.username && authenticatedUsername.toLowerCase() === room.black.username.toLowerCase());
 
                   // An outsider / third party has connected with the game link
                   if (!isWhite && !isBlack) {
-                    // If either player has left / closed their tab: VOID AND ABORT THE GAME
-                    if (!room.isWhiteConnected() || !room.isBlackConnected()) {
+                    // Only void if both players had previously connected and one left/disconnected!
+                    if (room.bothEverConnected() && (!room.isWhiteConnected() || !room.isBlackConnected())) {
                       room.finishGame('*', 'aborted');
                       roomManager.markCompleted(gameId, '*', 'aborted');
                       socket.send(
@@ -221,7 +228,7 @@ export function buildGameServer() {
                       socket.close(1000, 'GAME_VOIDED');
                       return;
                     }
-                    // Both players are connected: third party spectates only (no seating)
+                    // Both players are connected (or game just created): third party spectates only
                   }
                 } else {
                   // Only one player seated so far (waiting for opponent)
@@ -251,6 +258,13 @@ export function buildGameServer() {
                   const isAlreadyWhite = room.white.id === authenticatedUserId;
                   const isAlreadyBlack = room.black.id === authenticatedUserId;
 
+                  if (isAlreadyWhite && room.white.rating <= 200 && joinRating > 200) {
+                    room.white.rating = joinRating;
+                  }
+                  if (isAlreadyBlack && room.black.rating <= 200 && joinRating > 200) {
+                    room.black.rating = joinRating;
+                  }
+
                   if (!isAlreadyWhite && !isAlreadyBlack) {
                     const isWhiteEmpty = !room.white.id || room.white.id === 'Waiting...' || room.white.id === '';
                     const isBlackEmpty = !room.black.id || room.black.id === 'Waiting...' || room.black.id === '' || room.black.id === 'opponent_placeholder';
@@ -259,32 +273,32 @@ export function buildGameServer() {
                       room.setWhitePlayer({
                         id: authenticatedUserId,
                         username: authenticatedUsername,
-                        rating: 200,
+                        rating: joinRating,
                       });
                     } else if (preferredColor === 'black' && isBlackEmpty) {
                       room.setBlackPlayer({
                         id: authenticatedUserId,
                         username: authenticatedUsername,
-                        rating: 200,
+                        rating: joinRating,
                       });
                     } else if (isWhiteEmpty) {
                       room.setWhitePlayer({
                         id: authenticatedUserId,
                         username: authenticatedUsername,
-                        rating: 200,
+                        rating: joinRating,
                       });
                     } else if (isBlackEmpty) {
                       room.setBlackPlayer({
                         id: authenticatedUserId,
                         username: authenticatedUsername,
-                        rating: 200,
+                        rating: joinRating,
                       });
                     }
                   }
                 }
               }
 
-              room.addSocket(socket, authenticatedUserId);
+              room.addSocket(socket, authenticatedUserId, authenticatedUsername);
               break;
             }
 
@@ -294,7 +308,7 @@ export function buildGameServer() {
 
               const room = roomManager.getRoom(activeGameId);
               if (room) {
-                room.applyMove(authenticatedUserId, parse.data, socket);
+                room.applyMove(authenticatedUserId, parse.data, socket, authenticatedUsername);
               }
               break;
             }
@@ -335,7 +349,7 @@ export function buildGameServer() {
         if (activeGameId) {
           const room = roomManager.getRoom(activeGameId);
           if (room) {
-            room.removeSocket(socket, authenticatedUserId);
+            room.removeSocket(socket, authenticatedUserId, authenticatedUsername);
           }
         }
       });

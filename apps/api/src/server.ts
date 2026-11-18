@@ -330,12 +330,22 @@ export function buildServer(userRepo?: IUserRepository) {
       rapid: 200,
       blitz: 200,
       bullet: 200,
+      classical: 200,
     };
 
     for (const r of ratingsList) {
-      if (r.category in ratingsMap) {
+      if (r.system === 'fide' && r.category in ratingsMap) {
         ratingsMap[r.category] = r.rating;
       }
+    }
+
+    const byCategory: Record<string, { fide: number; chesscom: number; lichess: number }> = {};
+    for (const cat of ['bullet', 'blitz', 'rapid', 'classical']) {
+      byCategory[cat] = {
+        fide: ratingsList.find((r) => r.system === 'fide' && r.category === cat)?.rating || 200,
+        chesscom: ratingsList.find((r) => r.system === 'chess_com' && r.category === cat)?.rating || 200,
+        lichess: ratingsList.find((r) => r.system === 'lichess' && r.category === cat)?.rating || 200,
+      };
     }
 
     const rawGames = repo.getUserGames ? await repo.getUserGames(user.id) : [];
@@ -372,6 +382,7 @@ export function buildServer(userRepo?: IUserRepository) {
         isOnline,
       },
       ratings: ratingsMap,
+      byCategory,
       games,
     });
   });
@@ -710,8 +721,10 @@ export function buildServer(userRepo?: IUserRepository) {
     });
   });
 
-  app.register(challengesRoutes);
-  app.register(matchmakingRoutes);
+  app.register(async (instance) => {
+    await challengesRoutes(instance, repo);
+    await matchmakingRoutes(instance, repo);
+  });
 
   return app;
 }

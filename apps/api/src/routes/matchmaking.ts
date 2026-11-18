@@ -1,6 +1,17 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'node:crypto';
 import { z } from 'zod';
+import { IUserRepository } from '../auth/user-repository.js';
+
+function getTimeCategory(timeControl?: string): 'bullet' | 'blitz' | 'rapid' | 'classical' {
+  if (!timeControl) return 'blitz';
+  const [baseStr] = timeControl.split('+');
+  const baseMinutes = parseInt(baseStr, 10) || 5;
+  if (baseMinutes <= 2) return 'bullet';
+  if (baseMinutes <= 5) return 'blitz';
+  if (baseMinutes <= 30) return 'rapid';
+  return 'classical';
+}
 
 interface QueuedPlayer {
   userId: string;
@@ -8,6 +19,7 @@ interface QueuedPlayer {
   timeControl: string;
   rating: number;
   enqueuedAt: number;
+  queueToken: string;
   matchedGameId?: string;
   assignedColor?: 'white' | 'black';
 }
@@ -80,7 +92,7 @@ const JoinQueueSchema = z.object({
   rating: z.number().int().min(100).max(4000).default(1600),
 });
 
-export async function matchmakingRoutes(app: FastifyInstance) {
+export async function matchmakingRoutes(app: FastifyInstance, repo?: IUserRepository) {
   app.post('/api/v1/matchmaking/join', async (req: FastifyRequest, reply: FastifyReply) => {
     const parseRes = JoinQueueSchema.safeParse(req.body);
     if (!parseRes.success) {
@@ -89,18 +101,30 @@ export async function matchmakingRoutes(app: FastifyInstance) {
 
     const { userId, username, timeControl, rating } = parseRes.data;
 
+    let effectiveRating = rating;
+    if (repo && userId && !userId.startsWith('guest_') && !userId.startsWith('anon_')) {
+      try {
+        const cat = getTimeCategory(timeControl);
+        const ratings = await repo.getUserRatings(userId);
+        const fide = ratings.find((r) => r.system === 'fide' && r.category === cat)?.rating;
+        if (fide) effectiveRating = fide;
+      } catch {}
+    }
+
     const existing = playerLookup.get(userId);
     if (existing && !existing.matchedGameId) {
       const pool = queues.get(existing.timeControl) || [];
       queues.set(existing.timeControl, pool.filter((p) => p.userId !== userId));
     }
 
+    const queueToken = crypto.randomUUID();
     const queuedPlayer: QueuedPlayer = {
       userId,
       username,
       timeControl,
-      rating,
+      rating: effectiveRating,
       enqueuedAt: Date.now(),
+      queueToken,
     };
 
     if (!queues.has(timeControl)) {
@@ -125,6 +149,7 @@ export async function matchmakingRoutes(app: FastifyInstance) {
     return reply.send({
       status: 'queued',
       timeControl,
+      queueToken,
     });
   });
 
@@ -171,6 +196,7 @@ export async function matchmakingRoutes(app: FastifyInstance) {
       waitSeconds: Math.round(waitSeconds),
       ratingRange: range,
       timeControl: player.timeControl,
+      queueToken: player.queueToken,
     });
   });
 

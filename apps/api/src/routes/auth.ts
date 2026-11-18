@@ -145,9 +145,31 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
     }
 
     const ratingsList = await userRepo.getUserRatings(user.id);
-    const fide = ratingsList.find((r) => r.system === 'fide')?.rating || 200;
-    const chesscom = ratingsList.find((r) => r.system === 'chess_com')?.rating || 200;
-    const lichess = ratingsList.find((r) => r.system === 'lichess')?.rating || 200;
+    const categories = ['bullet', 'blitz', 'rapid', 'classical'] as const;
+    const byCategory: Record<string, { fide: number; chesscom: number; lichess: number }> = {};
+
+    for (const cat of categories) {
+      byCategory[cat] = {
+        fide: ratingsList.find((r) => r.system === 'fide' && r.category === cat)?.rating || 200,
+        chesscom: ratingsList.find((r) => r.system === 'chess_com' && r.category === cat)?.rating || 200,
+        lichess: ratingsList.find((r) => r.system === 'lichess' && r.category === cat)?.rating || 200,
+      };
+    }
+
+    // Determine primary category (highest non-default FIDE rating, or blitz as standard default)
+    let primaryCat: 'bullet' | 'blitz' | 'rapid' | 'classical' = 'blitz';
+    let maxRating = -1;
+    for (const cat of categories) {
+      const r = byCategory[cat].fide;
+      if (r !== 200 && r > maxRating) {
+        maxRating = r;
+        primaryCat = cat;
+      }
+    }
+
+    const fide = byCategory[primaryCat].fide;
+    const chesscom = byCategory[primaryCat].chesscom;
+    const lichess = byCategory[primaryCat].lichess;
 
     return reply.status(200).send({
       user: {
@@ -156,7 +178,13 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
         createdAt: user.createdAt,
         bio: user.bio || 'No bio',
         avatarUrl: user.avatarUrl || '',
-        ratings: { fide, chesscom, lichess },
+        ratings: {
+          fide,
+          chesscom,
+          lichess,
+          primaryCategory: primaryCat,
+          byCategory,
+        },
       },
     });
   });

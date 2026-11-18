@@ -36,6 +36,8 @@ export class GameRoom {
   private onGameOverCallback?: (result: GameResult, termination: GameTermination, winnerId?: string) => void;
   private whiteConnected = false;
   private blackConnected = false;
+  private whiteEverConnected = false;
+  private blackEverConnected = false;
   private clockStarted = false;
   private emptyRoomTimeout: NodeJS.Timeout | null = null;
   private playerDisconnectTimeout: NodeJS.Timeout | null = null;
@@ -66,6 +68,10 @@ export class GameRoom {
 
   public isBlackConnected(): boolean {
     return this.blackConnected;
+  }
+
+  public bothEverConnected(): boolean {
+    return this.whiteEverConnected && this.blackEverConnected;
   }
 
   public getStatus(): string {
@@ -115,15 +121,24 @@ export class GameRoom {
     });
   }
 
-  public addSocket(ws: WebSocket, userId: string): void {
+  public addSocket(ws: WebSocket, userId: string, username?: string): void {
     if (this.emptyRoomTimeout) {
       clearTimeout(this.emptyRoomTimeout);
       this.emptyRoomTimeout = null;
     }
 
     this.sockets.add(ws);
-    if (userId === this.white.id) this.whiteConnected = true;
-    if (userId === this.black.id) this.blackConnected = true;
+    const isWhiteMatch = userId === this.white.id || (username && this.white.username && username.toLowerCase() === this.white.username.toLowerCase());
+    const isBlackMatch = userId === this.black.id || (username && this.black.username && username.toLowerCase() === this.black.username.toLowerCase());
+
+    if (isWhiteMatch) {
+      this.whiteConnected = true;
+      this.whiteEverConnected = true;
+    }
+    if (isBlackMatch) {
+      this.blackConnected = true;
+      this.blackEverConnected = true;
+    }
 
     if (this.whiteConnected && this.blackConnected && this.playerDisconnectTimeout) {
       clearTimeout(this.playerDisconnectTimeout);
@@ -144,10 +159,13 @@ export class GameRoom {
     });
   }
 
-  public removeSocket(ws: WebSocket, userId: string): void {
+  public removeSocket(ws: WebSocket, userId: string, username?: string): void {
     this.sockets.delete(ws);
-    if (userId === this.white.id) this.whiteConnected = false;
-    if (userId === this.black.id) this.blackConnected = false;
+    const isWhiteMatch = userId === this.white.id || (username && this.white.username && username.toLowerCase() === this.white.username.toLowerCase());
+    const isBlackMatch = userId === this.black.id || (username && this.black.username && username.toLowerCase() === this.black.username.toLowerCase());
+
+    if (isWhiteMatch) this.whiteConnected = false;
+    if (isBlackMatch) this.blackConnected = false;
 
     this.broadcast({
       type: 'game:presence',
@@ -216,7 +234,7 @@ export class GameRoom {
     }
   }
 
-  public applyMove(userId: string, submission: MoveSubmission, clientWs: WebSocket): void {
+  public applyMove(userId: string, submission: MoveSubmission, clientWs: WebSocket, username?: string): void {
     if (this.status !== 'active') {
       this.sendTo(clientWs, {
         type: 'game:move_rejected',
@@ -226,9 +244,12 @@ export class GameRoom {
     }
 
     const expectedColor: PieceColor = this.engine.getTurn();
-    const activeUserId = expectedColor === 'w' ? this.white.id : this.black.id;
+    const activePlayer = expectedColor === 'w' ? this.white : this.black;
+    const isPlayerMatch =
+      userId === activePlayer.id ||
+      (username && activePlayer.username && username.toLowerCase() === activePlayer.username.toLowerCase());
 
-    if (userId !== activeUserId) {
+    if (!isPlayerMatch) {
       this.sendTo(clientWs, {
         type: 'game:move_rejected',
         payload: { expectedMoveNumber: this.moveNumber, errorCode: 'WRONG_TURN', currentFen: this.engine.getFen() },
@@ -396,6 +417,8 @@ export class GameRoom {
       gameId: this.gameId,
       white: this.white,
       black: this.black,
+      timeControl: this.timeControl,
+      rated: this.rated,
       fen: this.engine.getFen(),
       turn: this.engine.getTurn(),
       moveNumber: this.moveNumber,

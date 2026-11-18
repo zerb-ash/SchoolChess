@@ -2,6 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
+export interface CategoryRatings {
+  fide: number;
+  chesscom: number;
+  lichess: number;
+}
+
 export interface AuthUser {
   id: string;
   username: string;
@@ -12,6 +18,8 @@ export interface AuthUser {
     fide: number;
     chesscom: number;
     lichess: number;
+    primaryCategory?: string;
+    byCategory?: Record<string, CategoryRatings>;
   };
 }
 

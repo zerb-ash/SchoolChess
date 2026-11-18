@@ -98,6 +98,7 @@ export const GameJoinSchema = z.object({
   gameId: z.string().min(1),
   preferredColor: z.enum(['white', 'black']).optional(),
   timeControl: z.string().optional(),
+  rating: z.number().optional(),
 });
 export type GameJoin = z.infer<typeof GameJoinSchema>;
 

@@ -1,6 +1,17 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import crypto from 'node:crypto';
 import { z } from 'zod';
+import { IUserRepository } from '../auth/user-repository.js';
+
+function getTimeCategory(timeControl?: string): 'bullet' | 'blitz' | 'rapid' | 'classical' {
+  if (!timeControl) return 'blitz';
+  const [baseStr] = timeControl.split('+');
+  const baseMinutes = parseInt(baseStr, 10) || 5;
+  if (baseMinutes <= 2) return 'bullet';
+  if (baseMinutes <= 5) return 'blitz';
+  if (baseMinutes <= 30) return 'rapid';
+  return 'classical';
+}
 
 export interface ChallengeData {
   id: string;
@@ -14,8 +25,8 @@ export interface ChallengeData {
   status: 'open' | 'accepted' | 'cancelled' | 'expired';
   createdAt: number;
   gameId?: string;
-  whitePlayer?: { id: string; username: string };
-  blackPlayer?: { id: string; username: string };
+  whitePlayer?: { id: string; username: string; rating?: number };
+  blackPlayer?: { id: string; username: string; rating?: number };
 }
 
 const activeChallenges = new Map<string, ChallengeData>();
@@ -48,7 +59,10 @@ function generateShortCode(): string {
 const CreateChallengeSchema = z.object({
   creatorId: z.string().optional(),
   creatorUsername: z.string().min(1).max(30).optional(),
-  timeControl: z.enum(['1+0', '3+0', '5+0', '10+0', '15+10', '30+0']).default('5+0'),
+  timeControl: z
+    .string()
+    .regex(/^\d{1,3}\+\d{1,3}$/, 'Invalid time control format')
+    .default('5+0'),
   side: z.enum(['white', 'black', 'random']).default('random'),
   rated: z.boolean().default(false),
 });
@@ -58,7 +72,7 @@ const AcceptChallengeSchema = z.object({
   username: z.string().min(1).max(30).optional(),
 });
 
-export async function challengesRoutes(app: FastifyInstance) {
+export async function challengesRoutes(app: FastifyInstance, repo?: IUserRepository) {
   app.post('/api/v1/challenges', async (req: FastifyRequest, reply: FastifyReply) => {
     const parseRes = CreateChallengeSchema.safeParse(req.body);
     if (!parseRes.success) {
@@ -164,12 +178,35 @@ export async function challengesRoutes(app: FastifyInstance) {
 
     challenge.status = 'accepted';
     challenge.gameId = gameId;
-    challenge.whitePlayer = whiteAssignedToCreator
-      ? { id: challenge.creatorId, username: challenge.creatorUsername }
-      : { id: acceptorId, username: acceptorUsername };
-    challenge.blackPlayer = whiteAssignedToCreator
-      ? { id: acceptorId, username: acceptorUsername }
-      : { id: challenge.creatorId, username: challenge.creatorUsername };
+
+    const cat = getTimeCategory(challenge.timeControl);
+    let whiteRating = 200;
+    let blackRating = 200;
+
+    const whiteId = whiteAssignedToCreator ? challenge.creatorId : acceptorId;
+    const whiteUsername = whiteAssignedToCreator ? challenge.creatorUsername : acceptorUsername;
+    const blackId = whiteAssignedToCreator ? acceptorId : challenge.creatorId;
+    const blackUsername = whiteAssignedToCreator ? acceptorUsername : challenge.creatorUsername;
+
+    if (repo) {
+      if (whiteId && !whiteId.startsWith('guest_') && !whiteId.startsWith('anon_')) {
+        try {
+          const wRatings = await repo.getUserRatings(whiteId);
+          const r = wRatings.find((x) => x.system === 'fide' && x.category === cat)?.rating;
+          if (r) whiteRating = r;
+        } catch {}
+      }
+      if (blackId && !blackId.startsWith('guest_') && !blackId.startsWith('anon_')) {
+        try {
+          const bRatings = await repo.getUserRatings(blackId);
+          const r = bRatings.find((x) => x.system === 'fide' && x.category === cat)?.rating;
+          if (r) blackRating = r;
+        } catch {}
+      }
+    }
+
+    challenge.whitePlayer = { id: whiteId, username: whiteUsername, rating: whiteRating };
+    challenge.blackPlayer = { id: blackId, username: blackUsername, rating: blackRating };
 
     const gsUrl = process.env.GAME_SERVER_INTERNAL_URL || 'http://127.0.0.1:4001';
     fetch(`${gsUrl}/internal/rooms/create`, {

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Crown, Copy, Check, Users, Clock, Shield, Swords, ArrowRight, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../../lib/useAuth';
+import { getClientPlayerId, getClientPlayerUsername } from '../../../lib/guestPlayer';
 
 interface ChallengeInfo {
   id: string;
@@ -45,9 +46,10 @@ export default function ChallengePage() {
 
       if (data.challenge.status === 'accepted' && data.challenge.gameId) {
         const creatorIdStored = typeof window !== 'undefined' ? sessionStorage.getItem(`challenge_creator_id_${token}`) : null;
-        const myId = user?.id || creatorIdStored || data.challenge.creatorId;
-        const creatorColor = data.challenge.whitePlayer?.id === myId ? 'white' : 'black';
-        router.push(`/game/${data.challenge.gameId}?color=${creatorColor}`);
+        const myId = user?.id || creatorIdStored || getClientPlayerId();
+        const isWhite = data.challenge.whitePlayer?.id === myId;
+        const creatorColor = isWhite ? 'white' : 'black';
+        router.push(`/game/${data.challenge.gameId}?color=${creatorColor}&playerId=${encodeURIComponent(myId)}`);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load challenge');
@@ -80,12 +82,15 @@ export default function ChallengePage() {
   const handleAccept = async () => {
     setAccepting(true);
     try {
+      const myId = getClientPlayerId(user?.id);
+      const myUsername = getClientPlayerUsername(user?.username);
+
       const res = await fetch(`${API_BASE}/api/v1/challenges/${token}/accept`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: user?.id,
-          username: user?.username || 'Challenger',
+          userId: myId,
+          username: myUsername,
         }),
       });
 
@@ -95,7 +100,7 @@ export default function ChallengePage() {
       }
 
       const data = await res.json();
-      router.push(`/game/${data.gameId}?color=${data.yourColor || 'black'}`);
+      router.push(`/game/${data.gameId}?color=${data.yourColor || 'black'}&playerId=${encodeURIComponent(myId)}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error accepting challenge');
       setAccepting(false);
@@ -128,9 +133,11 @@ export default function ChallengePage() {
     );
   }
 
+  const myCurrentId = getClientPlayerId(user?.id);
   const isCreatorSession =
     (typeof window !== 'undefined' && sessionStorage.getItem(`created_challenge_${token}`) === 'true') ||
-    (typeof window !== 'undefined' && sessionStorage.getItem(`challenge_creator_id_${token}`) === challenge.creatorId);
+    (typeof window !== 'undefined' && sessionStorage.getItem(`challenge_creator_id_${token}`) === challenge.creatorId) ||
+    myCurrentId === challenge.creatorId;
   const isCreator = (user && user.id === challenge.creatorId) || isCreatorSession;
 
   return (

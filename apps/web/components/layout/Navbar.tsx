@@ -19,19 +19,31 @@ export const Navbar: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const navLinks = [
+  interface NavLinkItem {
+    href: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    onClick?: () => void;
+  }
+
+  const navLinks: NavLinkItem[] = [
     { href: '/', label: 'Home', icon: Crown },
     { href: '/play', label: 'Play', icon: Play },
     { href: '/play/computer', label: 'Computer', icon: Bot },
     { href: '/sandbox', label: 'Sandbox', icon: Swords },
     { href: '/leaderboards', label: 'Leaderboards', icon: Trophy },
     { href: '/find', label: 'Find', icon: Search },
-    {
-      href: user ? `/profile/@${user.username}` : '#',
-      label: 'Profile',
-      icon: User,
-      onClick: user ? undefined : () => openAuth('login'),
-    },
+    user
+      ? {
+          href: `/profile/@${user.username}`,
+          label: 'Profile',
+          icon: User,
+        }
+      : {
+          href: '/settings',
+          label: 'Settings',
+          icon: Settings,
+        },
   ];
 
   const openAuth = (mode: 'login' | 'register') => {
@@ -231,14 +243,16 @@ export const Navbar: React.FC = () => {
                 <span>Admin Panel</span>
               </Link>
             )}
-            <Link
-              href="/settings"
-              onClick={() => setMobileMenuOpen(false)}
-              className="px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider font-medium flex items-center gap-3 text-parchment-400 hover:text-parchment-200 hover:bg-wood-900"
-            >
-              <Settings className="w-4 h-4 text-brass-500" />
-              <span>Settings</span>
-            </Link>
+            {user && (
+              <Link
+                href="/settings"
+                onClick={() => setMobileMenuOpen(false)}
+                className="px-3.5 py-2.5 rounded-xl text-xs uppercase tracking-wider font-medium flex items-center gap-3 text-parchment-400 hover:text-parchment-200 hover:bg-wood-900"
+              >
+                <Settings className="w-4 h-4 text-brass-500" />
+                <span>Settings</span>
+              </Link>
+            )}
             {!user && (
               <button
                 onClick={() => openAuth('register')}

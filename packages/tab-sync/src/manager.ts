@@ -359,20 +359,20 @@ export class TabSocketManager {
   }
 
   // Public methods callable by React UI in ANY tab
-  public subscribeGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string): void {
+  public subscribeGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string, rating?: number): void {
     this.activeSubscriptions.add(gameId);
     if (preferredColor) {
       this.subscriptionColors.set(gameId, preferredColor);
     }
     if (this.role === 'leader') {
-      this.socketSend({ type: 'game:join', payload: { gameId, preferredColor, timeControl } });
+      this.socketSend({ type: 'game:join', payload: { gameId, preferredColor, timeControl, rating } });
     } else {
       this.broadcastIpc({ type: 'CLIENT_SUBSCRIBE', tabId: this.tabId, gameId, preferredColor });
     }
   }
 
-  public joinGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string): void {
-    this.subscribeGame(gameId, preferredColor, timeControl);
+  public joinGame(gameId: string, preferredColor?: 'white' | 'black', timeControl?: string, rating?: number): void {
+    this.subscribeGame(gameId, preferredColor, timeControl, rating);
   }
 
   public disconnect(): void {

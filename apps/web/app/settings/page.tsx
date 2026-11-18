@@ -300,7 +300,7 @@ export default function SettingsPage() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between py-2">
+          <div className="flex items-center justify-between py-2 border-b border-wood-800">
             <div>
               <span className="text-xs font-bold text-parchment-200 block">Auto-Flip When Playing Black</span>
               <span className="text-[11px] text-parchment-400">Automatically orient the board so your pieces are on the bottom</span>
@@ -314,6 +314,27 @@ export default function SettingsPage() {
               <div
                 className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
                   settings.autoFlipWhenBlack ? 'left-6' : 'left-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <span className="text-xs font-bold text-parchment-100 block">Confirm Every Move</span>
+              <span className="text-[11px] text-parchment-400">
+                Confirm before submitting moves in online games
+              </span>
+            </div>
+            <button
+              onClick={() => updateSettings({ confirmMove: !settings.confirmMove })}
+              className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+                settings.confirmMove ? 'bg-brass-600' : 'bg-wood-950 border border-wood-800'
+              }`}
+            >
+              <div
+                className={`w-4 h-4 rounded-full bg-parchment-100 shadow transition-transform absolute top-1 ${
+                  settings.confirmMove ? 'left-6' : 'left-1'
                 }`}
               />
             </button>

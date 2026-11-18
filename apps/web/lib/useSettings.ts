@@ -27,6 +27,7 @@ export interface AppSettings {
   autoQueenPromotion: boolean;
   autoFlipWhenBlack: boolean;
   highContrastHighlight: boolean;
+  confirmMove: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -42,6 +43,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoQueenPromotion: false,
   autoFlipWhenBlack: true,
   highContrastHighlight: false,
+  confirmMove: false,
 };
 
 const STORAGE_KEY = 'schoolchess_user_settings_v1';

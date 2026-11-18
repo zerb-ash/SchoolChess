@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Play, Swords, ArrowRight, UserPlus } from 'lucide-react';
 import { useAuth } from '../lib/useAuth';
@@ -8,8 +8,25 @@ import { AuthModal } from '../components/auth/AuthModal';
 import { BulletIcon, BlitzIcon, RapidIcon } from '../components/icons/ChessModeIcons';
 
 export default function HomePage() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<'blitz' | 'rapid' | 'bullet'>('blitz');
+
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
+
+  useEffect(() => {
+    if (user?.ratings?.primaryCategory && (user.ratings.primaryCategory === 'rapid' || user.ratings.primaryCategory === 'bullet' || user.ratings.primaryCategory === 'blitz')) {
+      setSelectedCategory(user.ratings.primaryCategory);
+    }
+  }, [user?.ratings?.primaryCategory]);
+
+  const catRatings = user?.ratings?.byCategory?.[selectedCategory] || {
+    fide: user?.ratings?.fide || 200,
+    chesscom: user?.ratings?.chesscom || 200,
+    lichess: user?.ratings?.lichess || 200,
+  };
 
   const timeControls = [
     { title: '1 min', sub: 'Bullet', speed: '1+0', icon: BulletIcon },
@@ -65,31 +82,46 @@ export default function HomePage() {
         </div>
 
         <div className="w-full md:w-84 bg-wood-950/90 border border-brass-500/30 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 backdrop-blur-md">
-          <div className="flex items-center justify-between border-b border-wood-800 pb-3">
-            <span className="text-xs font-serif font-bold tracking-wider text-parchment-200 uppercase">
+          <div className="flex items-center justify-between border-b border-wood-800 pb-3 gap-2">
+            <span className="text-xs font-serif font-bold tracking-wider text-parchment-200 uppercase whitespace-nowrap">
               Your Ratings
             </span>
+            <div className="flex items-center bg-wood-900/90 rounded-lg p-0.5 border border-wood-800 text-[10px] font-semibold">
+              {(['blitz', 'rapid', 'bullet'] as const).map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2 py-0.5 rounded capitalize transition-colors ${
+                    selectedCategory === cat
+                      ? 'bg-brass-500/20 text-brass-300 font-bold shadow-sm'
+                      : 'text-parchment-400 hover:text-parchment-200'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
               <span className="text-xs text-parchment-200 font-medium">FIDE Elo</span>
               <span className="text-base font-bold text-parchment-100 font-mono">
-                {user?.ratings?.fide || 200}
+                {catRatings.fide}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
               <span className="text-xs text-parchment-200 font-medium">Chess.com</span>
               <span className="text-base font-bold text-brass-400 font-mono">
-                {user?.ratings?.chesscom || 200}
+                {catRatings.chesscom}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-3 rounded-xl bg-wood-900 border border-wood-800">
               <span className="text-xs text-parchment-200 font-medium">Lichess</span>
               <span className="text-base font-bold text-parchment-300 font-mono">
-                {user?.ratings?.lichess || 200}
+                {catRatings.lichess}
               </span>
             </div>
           </div>

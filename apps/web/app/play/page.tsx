@@ -17,6 +17,7 @@ import {
 import { BulletIcon, BlitzIcon, RapidIcon, ClassicalIcon } from '../../components/icons/ChessModeIcons';
 import { useAuth } from '../../lib/useAuth';
 import { AuthModal } from '../../components/auth/AuthModal';
+import { getClientPlayerId, getClientPlayerUsername } from '../../lib/guestPlayer';
 
 import { getApiBaseUrl } from '../../lib/config';
 
@@ -48,6 +49,35 @@ export default function PlayPage() {
   const [creatingChallenge, setCreatingChallenge] = useState(false);
 
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentQueueTokenRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel('schoolchess_matchmaking_bus');
+    channel.onmessage = (event) => {
+      const data = event.data;
+      if (data?.type === 'QUEUE_STARTED') {
+        if (data.queueToken && data.queueToken !== currentQueueTokenRef.current) {
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          currentQueueTokenRef.current = null;
+          setActiveQueue(null);
+        }
+      } else if (data?.type === 'QUEUE_CANCELLED' || data?.type === 'QUEUE_MATCHED') {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+        currentQueueTokenRef.current = null;
+        setActiveQueue(null);
+      }
+    };
+    return () => {
+      channel.close();
+    };
+  }, []);
 
   const categories = [
     { id: 'all', label: 'All Modes' },
@@ -85,6 +115,9 @@ export default function PlayPage() {
 
     const userId = user.id;
     const username = user.username;
+    const tcObj = timeControls.find((t) => t.speed === speed);
+    const cat = tcObj?.category || 'blitz';
+    const modeRating = user?.ratings?.byCategory?.[cat]?.fide ?? user?.ratings?.fide ?? 200;
 
     try {
       const res = await fetch(`${API_BASE}/api/v1/matchmaking/join`, {
@@ -94,7 +127,7 @@ export default function PlayPage() {
           userId,
           username,
           timeControl: speed,
-          rating: user?.ratings?.fide || 200,
+          rating: modeRating,
         }),
       });
 
@@ -102,8 +135,23 @@ export default function PlayPage() {
 
       const data = await res.json();
       if (data.status === 'matched' && data.gameId) {
+        if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+          const ch = new BroadcastChannel('schoolchess_matchmaking_bus');
+          ch.postMessage({ type: 'QUEUE_MATCHED', gameId: data.gameId });
+          ch.close();
+        }
         router.push(`/game/${data.gameId}?color=${data.color || 'white'}`);
         return;
+      }
+
+      const queueToken = data.queueToken;
+      currentQueueTokenRef.current = queueToken;
+
+      // Broadcast to other tabs to immediately cancel their matchmaking UI
+      if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+        const ch = new BroadcastChannel('schoolchess_matchmaking_bus');
+        ch.postMessage({ type: 'QUEUE_STARTED', speed, queueToken, userId });
+        ch.close();
       }
 
       setActiveQueue({
@@ -121,8 +169,28 @@ export default function PlayPage() {
           if (statusData.status === 'matched' && statusData.gameId) {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
             pollIntervalRef.current = null;
+            currentQueueTokenRef.current = null;
+            if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+              const ch = new BroadcastChannel('schoolchess_matchmaking_bus');
+              ch.postMessage({ type: 'QUEUE_MATCHED', gameId: statusData.gameId });
+              ch.close();
+            }
             router.push(`/game/${statusData.gameId}?color=${statusData.color || 'white'}`);
           } else if (statusData.status === 'queued') {
+            // Verify if queue was superseded in another tab/mode
+            if (
+              (statusData.queueToken && currentQueueTokenRef.current && statusData.queueToken !== currentQueueTokenRef.current) ||
+              statusData.timeControl !== speed
+            ) {
+              if (pollIntervalRef.current) {
+                clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+              }
+              currentQueueTokenRef.current = null;
+              setActiveQueue(null);
+              return;
+            }
+
             setActiveQueue({
               timeControl: statusData.timeControl,
               waitSeconds: statusData.waitSeconds,
@@ -134,6 +202,7 @@ export default function PlayPage() {
               clearInterval(pollIntervalRef.current);
               pollIntervalRef.current = null;
             }
+            currentQueueTokenRef.current = null;
             setActiveQueue(null);
           }
         } catch {
@@ -151,6 +220,15 @@ export default function PlayPage() {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
+    currentQueueTokenRef.current = null;
+    setActiveQueue(null);
+
+    if (typeof window !== 'undefined' && typeof BroadcastChannel !== 'undefined') {
+      const ch = new BroadcastChannel('schoolchess_matchmaking_bus');
+      ch.postMessage({ type: 'QUEUE_CANCELLED', userId: user?.id });
+      ch.close();
+    }
+
     const userId = user?.id || '';
     if (userId) {
       try {
@@ -163,7 +241,6 @@ export default function PlayPage() {
         // Ignore
       }
     }
-    setActiveQueue(null);
   };
 
   useEffect(() => {
@@ -201,12 +278,15 @@ export default function PlayPage() {
   const handleCreateChallenge = async () => {
     setCreatingChallenge(true);
     try {
+      const myId = getClientPlayerId(user?.id);
+      const myUsername = getClientPlayerUsername(user?.username);
+
       const res = await fetch(`${API_BASE}/api/v1/challenges`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          creatorId: user?.id,
-          creatorUsername: user?.username || 'Challenger',
+          creatorId: myId,
+          creatorUsername: myUsername,
           timeControl: challengeTimeControl,
           side: challengeSide,
           rated: challengeRated,
