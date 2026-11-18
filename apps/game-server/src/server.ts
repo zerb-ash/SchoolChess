@@ -26,6 +26,44 @@ export function buildGameServer() {
     return { rooms: roomManager.getAllRooms() };
   });
 
+  app.post('/internal/rooms/create', async (req, reply) => {
+    const body = req.body as {
+      gameId: string;
+      white: { id: string; username: string; rating?: number };
+      black: { id: string; username: string; rating?: number };
+      timeControl?: string;
+      rated?: boolean;
+    };
+    if (!body?.gameId || !body?.white || !body?.black) {
+      return reply.code(400).send({ error: 'INVALID_PAYLOAD' });
+    }
+
+    const tc = body.timeControl || '5+0';
+    const [baseStr, incStr] = tc.split('+');
+    const baseTimeSeconds = (parseInt(baseStr, 10) || 5) * 60;
+    const incrementSeconds = parseInt(incStr, 10) || 0;
+
+    roomManager.getOrCreateRoom({
+      gameId: body.gameId,
+      white: {
+        id: body.white.id,
+        username: body.white.username,
+        rating: body.white.rating || 200,
+      },
+      black: {
+        id: body.black.id,
+        username: body.black.username,
+        rating: body.black.rating || 200,
+      },
+      baseTimeSeconds,
+      incrementSeconds,
+      rated: body.rated ?? true,
+      timeControl: tc,
+    });
+
+    return reply.send({ success: true, gameId: body.gameId });
+  });
+
   app.post('/internal/rooms/:gameId/terminate', async (req, reply) => {
     const { gameId } = req.params as { gameId: string };
     let room = roomManager.getRoom(gameId);

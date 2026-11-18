@@ -111,19 +111,25 @@ function LiveGameContent() {
           (state.black.id === effectiveUserId ||
             (effectiveUsername && state.black.username.toLowerCase() === effectiveUsername.toLowerCase()));
 
-        if (colorParam === 'white') {
-          setMyColor('w');
-          setOrientation('white');
-        } else if (colorParam === 'black') {
-          setMyColor('b');
-          setOrientation('black');
+        if (isWhite && isBlack) {
+          // Same account opened in two tabs for testing
+          if (colorParam === 'black') {
+            setMyColor('b');
+            setOrientation('black');
+          } else {
+            setMyColor('w');
+            setOrientation('white');
+          }
         } else if (isWhite && !isBlack) {
           setMyColor('w');
           setOrientation('white');
         } else if (isBlack && !isWhite) {
           setMyColor('b');
-          setOrientation(settings.autoFlipWhenBlack ? 'black' : 'white');
-        } else if (isWhite && isBlack) {
+          setOrientation(settings.autoFlipWhenBlack !== false ? 'black' : 'white');
+        } else if (colorParam === 'black') {
+          setMyColor('b');
+          setOrientation('black');
+        } else if (colorParam === 'white') {
           setMyColor('w');
           setOrientation('white');
         }

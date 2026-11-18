@@ -171,6 +171,19 @@ export async function challengesRoutes(app: FastifyInstance) {
       ? { id: acceptorId, username: acceptorUsername }
       : { id: challenge.creatorId, username: challenge.creatorUsername };
 
+    const gsUrl = process.env.GAME_SERVER_INTERNAL_URL || 'http://127.0.0.1:4001';
+    fetch(`${gsUrl}/internal/rooms/create`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gameId,
+        white: challenge.whitePlayer,
+        black: challenge.blackPlayer,
+        timeControl: challenge.timeControl,
+        rated: challenge.rated,
+      }),
+    }).catch(() => {});
+
     return reply.send({
       gameId,
       challenge,

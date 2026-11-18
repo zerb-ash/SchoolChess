@@ -102,7 +102,7 @@ export default function PlayPage() {
 
       const data = await res.json();
       if (data.status === 'matched' && data.gameId) {
-        router.push(`/game/${data.gameId}`);
+        router.push(`/game/${data.gameId}?color=${data.color || 'white'}`);
         return;
       }
 

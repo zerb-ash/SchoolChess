@@ -47,6 +47,22 @@ function processPairing(timeControl: string): void {
         p2.matchedGameId = gameId;
         p2.assignedColor = p1IsWhite ? 'black' : 'white';
 
+        const whitePlayer = p1IsWhite ? p1 : p2;
+        const blackPlayer = p1IsWhite ? p2 : p1;
+
+        const gsUrl = process.env.GAME_SERVER_INTERNAL_URL || 'http://127.0.0.1:4001';
+        fetch(`${gsUrl}/internal/rooms/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameId,
+            white: { id: whitePlayer.userId, username: whitePlayer.username, rating: whitePlayer.rating },
+            black: { id: blackPlayer.userId, username: blackPlayer.username, rating: blackPlayer.rating },
+            timeControl,
+            rated: true,
+          }),
+        }).catch(() => {});
+
         queues.set(
           timeControl,
           pool.filter((p) => p !== p1 && p !== p2)
