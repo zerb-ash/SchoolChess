@@ -488,11 +488,6 @@ export function buildServer(userRepo?: IUserRepository) {
   app.get('/api/v1/admin/overview', async (req, reply) => {
     if (!verifyAdmin(req, reply)) return;
 
-    const allUsers = (await repo.getAllUsers?.()) || [];
-    const completedGames = repo.getAllGames ? await repo.getAllGames() : ((repo as any).games || []);
-    const challenges = getAllActiveChallenges();
-    const matchmaking = getAllMatchmakingPlayers();
-
     let runningRooms: any[] = [];
     try {
       const gsRes = await fetch('http://127.0.0.1:4001/internal/rooms');
@@ -503,6 +498,17 @@ export function buildServer(userRepo?: IUserRepository) {
     } catch {
       // Game server might be local
     }
+
+    const activePlayerUserIds = new Set<string>();
+    for (const r of runningRooms) {
+      if (r.white?.id) activePlayerUserIds.add(r.white.id);
+      if (r.black?.id) activePlayerUserIds.add(r.black.id);
+    }
+
+    const allUsers = (await repo.getAllUsers?.()) || [];
+    const completedGames = repo.getAllGames ? await repo.getAllGames() : ((repo as any).games || []);
+    const challenges = getAllActiveChallenges();
+    const matchmaking = getAllMatchmakingPlayers(activePlayerUserIds);
 
     const onlineUsernames: string[] = [];
     for (const [userId] of activePresenceSessions.entries()) {
@@ -555,6 +561,12 @@ export function buildServer(userRepo?: IUserRepository) {
       // Game server offline
     }
 
+    const activePlayerUserIds = new Set<string>();
+    for (const r of liveRooms) {
+      if (r.white?.id) activePlayerUserIds.add(r.white.id);
+      if (r.black?.id) activePlayerUserIds.add(r.black.id);
+    }
+
     const challenges = getAllActiveChallenges().map((c) => ({
       type: 'challenge',
       id: c.token,
@@ -566,7 +578,7 @@ export function buildServer(userRepo?: IUserRepository) {
       startedAt: c.createdAt,
     }));
 
-    const matchmaking = getAllMatchmakingPlayers().map((m) => ({
+    const matchmaking = getAllMatchmakingPlayers(activePlayerUserIds).map((m) => ({
       type: 'matchmaking',
       id: m.userId,
       player: { id: m.userId, username: m.username, rating: m.rating },

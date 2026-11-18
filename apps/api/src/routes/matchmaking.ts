@@ -95,10 +95,19 @@ export async function matchmakingRoutes(app: FastifyInstance) {
 
     processPairing(timeControl);
 
+    if (queuedPlayer.matchedGameId) {
+      const res = {
+        status: 'matched',
+        gameId: queuedPlayer.matchedGameId,
+        color: queuedPlayer.assignedColor,
+        timeControl,
+      };
+      playerLookup.delete(userId);
+      return reply.send(res);
+    }
+
     return reply.send({
-      status: queuedPlayer.matchedGameId ? 'matched' : 'queued',
-      gameId: queuedPlayer.matchedGameId,
-      color: queuedPlayer.assignedColor,
+      status: 'queued',
       timeControl,
     });
   });
@@ -169,14 +178,20 @@ export async function matchmakingRoutes(app: FastifyInstance) {
   });
 }
 
-export function getAllMatchmakingPlayers(): QueuedPlayer[] {
+export function getAllMatchmakingPlayers(activeUserIds?: Set<string>): QueuedPlayer[] {
   const now = Date.now();
   for (const [userId, p] of playerLookup.entries()) {
-    if (now - p.enqueuedAt > 10 * 60 * 1000) {
+    if (
+      p.matchedGameId ||
+      now - p.enqueuedAt > 10 * 60 * 1000 ||
+      (activeUserIds && activeUserIds.has(userId))
+    ) {
       cancelMatchmakingForUser(userId);
     }
   }
-  return Array.from(playerLookup.values());
+  return Array.from(playerLookup.values()).filter(
+    (p) => !p.matchedGameId && (!activeUserIds || !activeUserIds.has(p.userId))
+  );
 }
 
 export function cancelMatchmakingForUser(userIdOrPartial: string): boolean {

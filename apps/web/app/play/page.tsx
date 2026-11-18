@@ -120,6 +120,7 @@ export default function PlayPage() {
           const statusData = await statusRes.json();
           if (statusData.status === 'matched' && statusData.gameId) {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
             router.push(`/game/${statusData.gameId}?color=${statusData.color || 'white'}`);
           } else if (statusData.status === 'queued') {
             setActiveQueue({
@@ -127,6 +128,13 @@ export default function PlayPage() {
               waitSeconds: statusData.waitSeconds,
               ratingRange: statusData.ratingRange,
             });
+          } else if (statusData.status === 'idle') {
+            // Queue was cancelled or ended by administrator
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
+            setActiveQueue(null);
           }
         } catch {
           // Continue polling
