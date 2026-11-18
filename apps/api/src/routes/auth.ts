@@ -37,7 +37,7 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       path: '/',
       httpOnly: true,
       secure: isHttps,
-      sameSite: 'lax',
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: COOKIE_MAX_AGE_SEC,
     });
 
@@ -84,7 +84,7 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       path: '/',
       httpOnly: true,
       secure: isHttps,
-      sameSite: 'lax',
+      sameSite: isHttps ? 'none' : 'lax',
       maxAge: COOKIE_MAX_AGE_SEC,
     });
 
@@ -103,7 +103,13 @@ export function registerAuthRoutes(app: FastifyInstance, userRepo: IUserReposito
       sessionStore.revokeSession(token);
     }
 
-    reply.clearCookie(COOKIE_NAME, { path: '/' });
+    const isHttps = request.protocol === 'https' || request.headers['x-forwarded-proto'] === 'https';
+    reply.clearCookie(COOKIE_NAME, {
+      path: '/',
+      httpOnly: true,
+      secure: isHttps,
+      sameSite: isHttps ? 'none' : 'lax',
+    });
     return reply.status(200).send({ success: true });
   });
 

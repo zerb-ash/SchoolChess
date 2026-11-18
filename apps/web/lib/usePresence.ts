@@ -23,7 +23,8 @@ export function usePresence() {
         });
 
         eventSource.onerror = () => {
-          // If disconnected, let EventSource handle reconnect or retry after pause
+          // If unauthenticated or connection drops, close to prevent infinite 401 retry loops
+          stopTunnel();
         };
       } catch {
         // Ignore network failure

@@ -62,35 +62,8 @@ export function useAuth() {
           localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
         }
       } else {
-        const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
-        if (stored) {
-          try {
-            const parsed: AuthUser = JSON.parse(stored);
-            if (parsed?.username) {
-              try {
-                const pRes = await fetch(`${API_BASE}/api/v1/users/${parsed.username}`);
-                if (pRes.ok) {
-                  const pData = await pRes.json();
-                  if (pData.user?.avatarUrl) parsed.avatarUrl = pData.user.avatarUrl;
-                  if (pData.user?.bio) parsed.bio = pData.user.bio;
-                }
-              } catch {
-                // Keep parsed
-              }
-              setUser(parsed);
-              localStorage.setItem(LOCAL_STORAGE_USER_KEY, JSON.stringify(parsed));
-            } else {
-              setUser(null);
-              localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-            }
-          } catch {
-            setUser(null);
-            localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-          }
-        } else {
-          setUser(null);
-          localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
-        }
+        setUser(null);
+        localStorage.removeItem(LOCAL_STORAGE_USER_KEY);
       }
     } catch {
       const stored = localStorage.getItem(LOCAL_STORAGE_USER_KEY);
