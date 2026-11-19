@@ -10,7 +10,7 @@ import { useAppSettings } from '../../../lib/useSettings';
 import { soundSystem } from '../../../lib/audio';
 import { evaluatePosition, PositionEvaluation } from '@schoolchess/chess-core';
 import { stockfishService, BOT_LEVEL_CONFIGS, BotLevelConfig } from '../../../lib/stockfishService';
-import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap, Sparkles } from 'lucide-react';
+import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap } from 'lucide-react';
 
 export default function PlayComputerPage() {
   const { currentThemeColors: themeColors, settings } = useAppSettings();
@@ -122,7 +122,7 @@ export default function PlayComputerPage() {
         isExecutingBotRef.current = false;
         setIsBotThinking(false);
       }
-    }, 150);
+    }, 40);
 
     return () => {
       if (botTimerRef.current) {
@@ -214,16 +214,10 @@ export default function PlayComputerPage() {
       {/* Left Column: Bot Difficulty Picker */}
       <div className="w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px] lg:max-w-none lg:w-72 flex flex-col gap-4 order-2 lg:order-1">
         <div className="bg-wood-900 border border-wood-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
-              <Bot className="w-4 h-4 text-brass-400" />
-              <span>Stockfish Difficulty</span>
-            </h2>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-wood-950/80 text-emerald-400 border border-emerald-500/20 font-mono flex items-center gap-1">
-              <Sparkles className="w-2.5 h-2.5" />
-              <span>Stockfish WASM</span>
-            </span>
-          </div>
+          <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
+            <Bot className="w-4 h-4 text-brass-400" />
+            <span>Select Bot Opponent</span>
+          </h2>
 
           <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
             {BOT_LEVEL_CONFIGS.map((bot) => (

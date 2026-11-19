@@ -24,14 +24,14 @@ export interface BotLevelConfig {
 }
 
 export const BOT_LEVEL_CONFIGS: BotLevelConfig[] = [
-  { level: 1, name: 'Beginner Bot', elo: 400, desc: 'Exploratory play with frequent tactical oversights.', skillLevel: 0, movetime: 250 },
-  { level: 2, name: 'Casual Bot', elo: 800, desc: 'Understands basic captures and simple openings.', skillLevel: 1, movetime: 350 },
-  { level: 3, name: 'Club Bot', elo: 1100, desc: 'True 1100 Elo. Solid development and tactical vigilance.', skillLevel: 3, movetime: 450 },
-  { level: 4, name: 'Intermediate Bot', elo: 1500, desc: 'Strong positional play, plans several moves ahead.', skillLevel: 7, movetime: 550 },
-  { level: 5, name: 'Advanced Bot', elo: 1800, desc: 'Punishes tactical inaccuracies and seizes open files.', skillLevel: 11, movetime: 650 },
-  { level: 6, name: 'Expert Bot', elo: 2100, desc: 'Tournament-grade tactical depth and sharp endgame calculation.', skillLevel: 15, movetime: 750 },
-  { level: 7, name: 'Master Bot', elo: 2500, desc: 'Relentless Grandmaster precision with deep calculation.', skillLevel: 18, movetime: 800 },
-  { level: 8, name: 'Max Level Stockfish', elo: 3200, desc: 'Superhuman peak Stockfish depth (Skill Level 20).', skillLevel: 20, movetime: 850 },
+  { level: 1, name: 'Beginner Bot', elo: 400, desc: 'Just learning the rules. Hangs pieces and falls for easy traps.', skillLevel: 0, movetime: 180 },
+  { level: 2, name: 'Casual Bot', elo: 800, desc: 'Knows basic moves, but leaves pieces hanging if under pressure.', skillLevel: 1, movetime: 220 },
+  { level: 3, name: 'Club Bot', elo: 1100, desc: 'Plays solid openings, snatches free pieces, and punishes blunders.', skillLevel: 3, movetime: 280 },
+  { level: 4, name: 'Intermediate Bot', elo: 1500, desc: 'Sharp tactics, castles early, and coordinates pieces for real attacks.', skillLevel: 7, movetime: 350 },
+  { level: 5, name: 'Advanced Bot', elo: 1800, desc: 'Aggressive and punishing. Spots multi-move tactical combinations.', skillLevel: 11, movetime: 420 },
+  { level: 6, name: 'Expert Bot', elo: 2100, desc: 'Ruthless tournament strength. One slip and it suffocates your position.', skillLevel: 15, movetime: 500 },
+  { level: 7, name: 'Master Bot', elo: 2500, desc: 'Grandmaster play. Absolutely zero mercy on mistakes and converts every edge.', skillLevel: 18, movetime: 600 },
+  { level: 8, name: 'Max Level Stockfish', elo: 3200, desc: 'Unbeatable engine god. Calculates millions of lines to crush your soul.', skillLevel: 20, movetime: 700 },
 ];
 
 class StockfishWorkerService {
@@ -181,9 +181,10 @@ class StockfishWorkerService {
             this.currentResolver = null;
             this.currentRejecter = null;
             reject(new Error('Stockfish worker timed out'));
-          }, config.movetime + 800);
+          }, config.movetime + 500);
 
           this.worker?.postMessage('stop');
+          this.worker?.postMessage('setoption name Hash value 32');
           this.worker?.postMessage(`setoption name Skill Level value ${config.skillLevel}`);
           this.worker?.postMessage(`position fen ${fen}`);
           this.worker?.postMessage(`go movetime ${config.movetime}`);
