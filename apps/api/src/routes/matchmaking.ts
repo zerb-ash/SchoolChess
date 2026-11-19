@@ -218,6 +218,22 @@ export async function matchmakingRoutes(app: FastifyInstance, repo?: IUserReposi
 
     return reply.send({ status: 'cancelled' });
   });
+
+  app.get('/api/v1/matchmaking/counts', async (_req: FastifyRequest, reply: FastifyReply) => {
+    const now = Date.now();
+    const counts: Record<string, number> = {};
+    let totalWaiting = 0;
+
+    for (const [tc, pool] of queues.entries()) {
+      const active = pool.filter((p) => !p.matchedGameId && now - p.enqueuedAt < 10 * 60 * 1000);
+      if (active.length > 0) {
+        counts[tc] = active.length;
+        totalWaiting += active.length;
+      }
+    }
+
+    return reply.send({ counts, totalWaiting });
+  });
 }
 
 export function getAllMatchmakingPlayers(activeUserIds?: Set<string>): QueuedPlayer[] {

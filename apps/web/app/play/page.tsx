@@ -51,6 +51,30 @@ export default function PlayPage() {
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentQueueTokenRef = useRef<string | null>(null);
 
+  const [queueCounts, setQueueCounts] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCounts = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/matchmaking/counts`);
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data.counts) {
+            setQueueCounts(data.counts);
+          }
+        }
+      } catch {}
+    };
+
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return;
     const channel = new BroadcastChannel('schoolchess_matchmaking_bus');
@@ -374,11 +398,12 @@ export default function PlayPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
             {filteredControls.map((tc) => {
               const Icon = tc.icon;
+              const waitingCount = queueCounts[tc.speed] || 0;
               return (
                 <button
                   key={tc.speed}
                   onClick={() => handleJoinQueue(tc.speed)}
-                  className="p-4 rounded-xl bg-wood-900 border border-wood-800 hover:border-brass-500/50 hover:bg-wood-850 flex flex-col justify-between gap-3 transition-all hover:-translate-y-0.5 shadow-md group text-left cursor-pointer min-h-[110px]"
+                  className="p-4 rounded-xl bg-wood-900 border border-wood-800 hover:border-brass-500/50 hover:bg-wood-850 flex flex-col justify-between gap-3 transition-all hover:-translate-y-0.5 shadow-md group text-left cursor-pointer min-h-[120px]"
                 >
                   <div className="flex items-center justify-between w-full">
                     <Icon className="w-5 h-5 group-hover:scale-110 transition-transform drop-shadow" />
@@ -392,6 +417,21 @@ export default function PlayPage() {
                     </div>
                     <div className="text-[11px] font-medium text-parchment-400">
                       {tc.sub}
+                    </div>
+
+                    {/* Live Waiting Badge */}
+                    <div className="mt-2 flex items-center">
+                      {waitingCount > 0 ? (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono py-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span>{waitingCount} {waitingCount === 1 ? 'person waiting' : 'people waiting'}</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 text-[10px] text-parchment-600 font-mono py-0.5">
+                          <span className="w-1 h-1 rounded-full bg-wood-700" />
+                          <span>0 waiting</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
