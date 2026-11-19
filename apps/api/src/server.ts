@@ -5,6 +5,7 @@ import url from 'node:url';
 import { registerAuthRoutes, COOKIE_NAME, extractToken } from './routes/auth.js';
 import { challengesRoutes, getAllActiveChallenges, cancelChallenge } from './routes/challenges.js';
 import { matchmakingRoutes, getAllMatchmakingPlayers, cancelMatchmakingForUser } from './routes/matchmaking.js';
+import { botRoutes } from './routes/bot.js';
 import { sessionStore } from './auth/session.js';
 import { IUserRepository, InMemoryUserRepository, PostgresUserRepository, ResilientUserRepository } from './auth/user-repository.js';
 import { createDatabaseClient } from '@schoolchess/database';
@@ -724,6 +725,7 @@ export function buildServer(userRepo?: IUserRepository) {
   app.register(async (instance) => {
     await challengesRoutes(instance, repo);
     await matchmakingRoutes(instance, repo);
+    await botRoutes(instance);
   });
 
   return app;

@@ -8,16 +8,9 @@ import { EvaluationBar } from '../../../components/board/EvaluationBar';
 import { computeCapturedPieces } from '../../../lib/chessCaptured';
 import { useAppSettings } from '../../../lib/useSettings';
 import { soundSystem } from '../../../lib/audio';
-import { computeBotMove, evaluatePosition, PositionEvaluation } from '@schoolchess/chess-core';
-import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap, Lock } from 'lucide-react';
-
-const BOT_LEVELS = [
-  { level: 1, name: 'Beginner Bot', elo: 200, desc: 'Casual starter bot. Makes blunders and exploratory moves.', locked: false },
-  { level: 2, name: 'Novice Bot', elo: 600, desc: 'Takes hanging pieces and avoids immediate 1-move traps.', locked: false },
-  { level: 3, name: 'Club Bot', elo: 1100, desc: 'Solid tactical play, searches 2 moves ahead.', locked: false },
-  { level: 4, name: 'Expert Bot', elo: 1600, desc: 'Positional awareness using piece-square tables.', locked: true },
-  { level: 5, name: 'Master Bot', elo: 2000, desc: 'Deep alpha-beta search with aggressive counter-attacks.', locked: true },
-];
+import { evaluatePosition, PositionEvaluation } from '@schoolchess/chess-core';
+import { stockfishService, BOT_LEVEL_CONFIGS, BotLevelConfig } from '../../../lib/stockfishService';
+import { Bot, RotateCcw, Flag, ArrowUpDown, Clock, Trophy, ChevronRight, Zap, Sparkles } from 'lucide-react';
 
 export default function PlayComputerPage() {
   const { currentThemeColors: themeColors, settings } = useAppSettings();
@@ -88,7 +81,7 @@ export default function PlayComputerPage() {
     }
 
     setIsBotThinking(true);
-    botTimerRef.current = setTimeout(() => {
+    botTimerRef.current = setTimeout(async () => {
       if (isExecutingBotRef.current || chess.isGameOver()) {
         setIsBotThinking(false);
         return;
@@ -107,11 +100,11 @@ export default function PlayComputerPage() {
           return;
         }
 
-        const move = computeBotMove(chess.fen(), botLevel);
+        const move = await stockfishService.getMove(chess.fen(), botLevel);
         const res = chess.move({
           from: move.from,
           to: move.to,
-          promotion: move.promotion || 'q',
+          promotion: (move.promotion as 'q' | 'r' | 'b' | 'n') || 'q',
         });
 
         if (res) {
@@ -129,7 +122,7 @@ export default function PlayComputerPage() {
         isExecutingBotRef.current = false;
         setIsBotThinking(false);
       }
-    }, 300);
+    }, 150);
 
     return () => {
       if (botTimerRef.current) {
@@ -197,7 +190,7 @@ export default function PlayComputerPage() {
   };
 
   const moveHistory = useMemo(() => chess.history(), [fen]);
-  const currentBot = BOT_LEVELS.find((b) => b.level === botLevel) || BOT_LEVELS[0];
+  const currentBot = BOT_LEVEL_CONFIGS.find((b) => b.level === botLevel) || BOT_LEVEL_CONFIGS[2];
 
   const topColor = orientation === 'white' ? 'black' : 'white';
   const bottomColor = orientation === 'white' ? 'white' : 'black';
@@ -221,38 +214,42 @@ export default function PlayComputerPage() {
       {/* Left Column: Bot Difficulty Picker */}
       <div className="w-full max-w-[min(100vw-16px,calc(100vh-220px))] sm:max-w-[540px] md:max-w-[620px] lg:max-w-none lg:w-72 flex flex-col gap-4 order-2 lg:order-1">
         <div className="bg-wood-900 border border-wood-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
-          <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
-            <Bot className="w-4 h-4 text-brass-400" />
-            <span>Select Bot Opponent</span>
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-serif font-bold uppercase tracking-wider text-parchment-300 flex items-center gap-2">
+              <Bot className="w-4 h-4 text-brass-400" />
+              <span>Stockfish Difficulty</span>
+            </h2>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-wood-950/80 text-emerald-400 border border-emerald-500/20 font-mono flex items-center gap-1">
+              <Sparkles className="w-2.5 h-2.5" />
+              <span>Stockfish WASM</span>
+            </span>
+          </div>
 
-          <div className="flex flex-col gap-2">
-            {BOT_LEVELS.map((bot) => (
+          <div className="flex flex-col gap-2 max-h-[480px] overflow-y-auto pr-1">
+            {BOT_LEVEL_CONFIGS.map((bot) => (
               <button
                 key={bot.level}
-                onClick={() => {
-                  if (!bot.locked) setBotLevel(bot.level);
-                }}
-                disabled={bot.locked}
-                className={`p-3 rounded-xl border text-left transition-all flex flex-col gap-1 ${
-                  bot.locked
-                    ? 'border-wood-850 bg-wood-950/40 opacity-40 cursor-not-allowed select-none'
-                    : botLevel === bot.level
-                    ? 'border-brass-400 bg-wood-850 shadow-md cursor-pointer'
-                    : 'border-wood-800 bg-wood-950/60 hover:bg-wood-850 cursor-pointer'
+                onClick={() => setBotLevel(bot.level)}
+                className={`p-2.5 rounded-xl border text-left transition-all flex flex-col gap-1 cursor-pointer ${
+                  botLevel === bot.level
+                    ? 'border-brass-400 bg-wood-850 shadow-md ring-1 ring-brass-400/20'
+                    : 'border-wood-800 bg-wood-950/60 hover:bg-wood-850'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    {bot.locked && <Lock className="w-3 h-3 text-parchment-500" />}
-                    <span className="text-xs font-bold text-parchment-100">{bot.name}</span>
-                  </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-wood-950 text-brass-400 font-mono">
-                    {bot.locked ? 'Locked' : `~${bot.elo} Elo`}
+                  <span className="text-xs font-bold text-parchment-100">{bot.name}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
+                      bot.level === 8
+                        ? 'bg-salon-crimson/20 text-red-300 border border-salon-crimson/30 font-bold'
+                        : 'bg-wood-950 text-brass-400'
+                    }`}
+                  >
+                    ~{bot.elo} Elo
                   </span>
                 </div>
                 <p className="text-[10px] text-parchment-400 leading-tight">
-                  {bot.locked ? 'Locked (optimization in progress).' : bot.desc}
+                  {bot.desc}
                 </p>
               </button>
             ))}
