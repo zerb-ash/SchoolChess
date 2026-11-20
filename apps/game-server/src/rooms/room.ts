@@ -220,14 +220,24 @@ export class GameRoom {
         if (this.playerDisconnectTimeout) clearTimeout(this.playerDisconnectTimeout);
         this.playerDisconnectTimeout = setTimeout(() => {
           if (!this.whiteConnected && this.blackConnected && this.status === 'active') {
-            this.finishGame('0-1', 'abandoned', this.black.id);
+            const blackHasMaterial = this.engine.hasSufficientMaterial('b');
+            if (blackHasMaterial) {
+              this.finishGame('0-1', 'abandoned', this.black.id);
+            } else {
+              this.finishGame('1/2-1/2', 'abandoned', undefined);
+            }
           }
         }, 60000);
       } else if (!this.blackConnected && this.whiteConnected) {
         if (this.playerDisconnectTimeout) clearTimeout(this.playerDisconnectTimeout);
         this.playerDisconnectTimeout = setTimeout(() => {
           if (!this.blackConnected && this.whiteConnected && this.status === 'active') {
-            this.finishGame('1-0', 'abandoned', this.white.id);
+            const whiteHasMaterial = this.engine.hasSufficientMaterial('w');
+            if (whiteHasMaterial) {
+              this.finishGame('1-0', 'abandoned', this.white.id);
+            } else {
+              this.finishGame('1/2-1/2', 'abandoned', undefined);
+            }
           }
         }, 60000);
       }
@@ -359,9 +369,17 @@ export class GameRoom {
 
   private handleTimeout(loserColor: 'w' | 'b'): void {
     if (this.status !== 'active') return;
-    const result = loserColor === 'w' ? '0-1' : '1-0';
-    const winnerId = loserColor === 'w' ? this.black.id : this.white.id;
-    this.finishGame(result, 'timeout', winnerId);
+    const opponentColor: PieceColor = loserColor === 'w' ? 'b' : 'w';
+    const opponentHasMaterial = this.engine.hasSufficientMaterial(opponentColor);
+
+    if (!opponentHasMaterial) {
+      // FIDE Rule 6.9: Timeout vs Insufficient Material -> Draw!
+      this.finishGame('1/2-1/2', 'timeout', undefined);
+    } else {
+      const result = loserColor === 'w' ? '0-1' : '1-0';
+      const winnerId = loserColor === 'w' ? this.black.id : this.white.id;
+      this.finishGame(result, 'timeout', winnerId);
+    }
   }
 
   public finishGame(result: GameResult, termination: GameTermination, winnerId?: string): void {

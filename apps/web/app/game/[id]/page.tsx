@@ -14,6 +14,7 @@ import { getWsBaseUrl, getApiBaseUrl } from '../../../lib/config';
 import { TabSocketManager } from '@schoolchess/tab-sync';
 import { Clock, ShieldCheck, Flag, Handshake, Trophy, ArrowUpDown, User, Eye, AlertTriangle, CheckCircle2, XCircle, ArrowRight, Check, X } from 'lucide-react';
 import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
+import { hasSufficientMaterialToMate } from '@schoolchess/chess-core';
 
 const API_BASE = getApiBaseUrl();
 
@@ -32,7 +33,28 @@ function formatDuration(sec: number): string {
   return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
-function formatTermination(termination?: string): string {
+function formatTermination(
+  termination?: string,
+  result?: string,
+  myColor?: 'w' | 'b' | null,
+  fen?: string
+): string {
+  const isDraw = result === '1/2-1/2';
+  if (isDraw && termination?.toLowerCase() === 'timeout' && fen && myColor) {
+    try {
+      const chess = new Chess(fen);
+      const myHasMaterial = hasSufficientMaterialToMate(chess, myColor);
+      return myHasMaterial ? 'Timeout' : 'Insufficient Material';
+    } catch {}
+  }
+  if (isDraw && termination?.toLowerCase() === 'abandoned' && fen && myColor) {
+    try {
+      const chess = new Chess(fen);
+      const myHasMaterial = hasSufficientMaterialToMate(chess, myColor);
+      return myHasMaterial ? 'Abandoned' : 'Insufficient Material';
+    } catch {}
+  }
+
   switch (termination?.toLowerCase()) {
     case 'checkmate':
       return 'Checkmate';
@@ -685,9 +707,10 @@ function LiveGameContent() {
     gameOverData?.termination === 'insufficient_material' ||
     gameOverData?.termination === 'fifty_moves';
   const isAborted =
-    gameOverData?.result === '*' ||
-    gameOverData?.termination === 'aborted' ||
-    gameOverData?.termination === 'abandoned';
+    !isDraw &&
+    (gameOverData?.result === '*' ||
+      gameOverData?.termination === 'aborted' ||
+      gameOverData?.termination === 'abandoned');
 
   const isMyWin = (myColor === 'w' && isWhiteWinner) || (myColor === 'b' && isBlackWinner);
   const isMyLoss = (myColor === 'w' && isBlackWinner) || (myColor === 'b' && isWhiteWinner);
@@ -908,7 +931,7 @@ function LiveGameContent() {
                         <span>Draw</span>
                       </div>
                       <span className="text-xs text-parchment-400">
-                        by {formatTermination(gameOverData?.termination || 'draw')}
+                        by {formatTermination(gameOverData?.termination || 'draw', gameOverData?.result, myColor, fen)}
                       </span>
                     </>
                   ) : isMyWin ? (

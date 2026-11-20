@@ -48,6 +48,10 @@ export class ChessGameEngine {
     return this.instance.isGameOver();
   }
 
+  public hasSufficientMaterial(color: PieceColor): boolean {
+    return hasSufficientMaterialToMate(this.instance, color);
+  }
+
   /**
    * Validates and applies a move in sub-millisecond execution time.
    */
@@ -127,6 +131,74 @@ export class ChessGameEngine {
       return false;
     }
   }
+}
+
+/**
+ * Determines whether a player has sufficient mating material under standard chess rules.
+ * A player has insufficient material if checkmate is impossible against a lone king
+ * (e.g. lone King, King + 1 Knight, King + 1 Bishop, King + Bishops on the same color,
+ * or King + 2 Knights against a lone King).
+ */
+export function hasSufficientMaterialToMate(chess: Chess, color: PieceColor): boolean {
+  const board = chess.board();
+  let pawns = 0;
+  let rooks = 0;
+  let queens = 0;
+  let knights = 0;
+  let bishops = 0;
+  const bishopColors: ('light' | 'dark')[] = [];
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (!piece || piece.color !== color) continue;
+
+      if (piece.type === 'p') pawns++;
+      else if (piece.type === 'r') rooks++;
+      else if (piece.type === 'q') queens++;
+      else if (piece.type === 'n') knights++;
+      else if (piece.type === 'b') {
+        bishops++;
+        const isLight = (r + c) % 2 === 0;
+        bishopColors.push(isLight ? 'light' : 'dark');
+      }
+    }
+  }
+
+  // Any pawn, rook, or queen can always deliver checkmate
+  if (pawns > 0 || rooks > 0 || queens > 0) return true;
+
+  // Lone king cannot checkmate
+  if (knights === 0 && bishops === 0) return false;
+
+  // King + single minor piece (1 knight or 1 bishop) cannot checkmate a lone king
+  if (knights === 1 && bishops === 0) return false;
+  if (bishops === 1 && knights === 0) return false;
+
+  // King + multiple bishops all on the same square color cannot checkmate
+  if (knights === 0 && bishops >= 2) {
+    const allSameColor = bishopColors.every((c) => c === bishopColors[0]);
+    if (allSameColor) return false;
+  }
+
+  // Check opponent's non-king pieces
+  const oppColor = color === 'w' ? 'b' : 'w';
+  let oppNonKingPieces = 0;
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const piece = board[r][c];
+      if (piece && piece.color === oppColor && piece.type !== 'k') {
+        oppNonKingPieces++;
+      }
+    }
+  }
+
+  // Two knights vs lone king cannot force checkmate
+  if (knights === 2 && bishops === 0 && oppNonKingPieces === 0) {
+    return false;
+  }
+
+  return true;
 }
 
 export * from './bot-engine.js';

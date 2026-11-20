@@ -24,6 +24,8 @@ import {
 import { MiniBoard } from '../../../components/board/MiniBoard';
 import { BulletIcon, BlitzIcon, RapidIcon, ClassicalIcon } from '../../../components/icons/ChessModeIcons';
 import { OwnerBadge, isOwner } from '../../../components/ui/OwnerBadge';
+import { Chess } from 'chess.js';
+import { hasSufficientMaterialToMate } from '@schoolchess/chess-core';
 
 interface UserProfileData {
   id: string;
@@ -54,6 +56,65 @@ interface CompletedGame {
   accuracyBlack?: number;
   finalFen?: string;
   playedAt: string;
+}
+
+function getPerspectiveTerminationLabel(g: CompletedGame, profileId: string): string {
+  const isWhite = g.whiteUserId === profileId;
+  const isDraw = g.result === '1/2-1/2';
+
+  if (isDraw && (g.termination === 'timeout' || g.termination === 'insufficient_material')) {
+    if (g.finalFen) {
+      try {
+        const chess = new Chess(g.finalFen);
+        const whiteHas = hasSufficientMaterialToMate(chess, 'w');
+        const blackHas = hasSufficientMaterialToMate(chess, 'b');
+
+        if (!whiteHas && blackHas) {
+          // White lacks material, Black flagged
+          return isWhite ? 'Insufficient Material' : 'Timeout';
+        }
+        if (!blackHas && whiteHas) {
+          // Black lacks material, White flagged
+          return !isWhite ? 'Insufficient Material' : 'Timeout';
+        }
+      } catch {}
+    }
+    return isWhite ? 'Insufficient Material' : 'Timeout';
+  }
+
+  if (isDraw && g.termination === 'abandoned') {
+    if (g.finalFen) {
+      try {
+        const chess = new Chess(g.finalFen);
+        const whiteHas = hasSufficientMaterialToMate(chess, 'w');
+        const blackHas = hasSufficientMaterialToMate(chess, 'b');
+        if (!whiteHas && blackHas) return isWhite ? 'Insufficient Material' : 'Abandoned';
+        if (!blackHas && whiteHas) return !isWhite ? 'Insufficient Material' : 'Abandoned';
+      } catch {}
+    }
+  }
+
+  switch (g.termination) {
+    case 'checkmate':
+      return 'Checkmate';
+    case 'resignation':
+      return 'Resignation';
+    case 'timeout':
+      return 'Timeout';
+    case 'draw_agreed':
+    case 'draw_agreement':
+      return 'Draw by agreement';
+    case 'stalemate':
+      return 'Stalemate';
+    case 'repetition':
+      return 'Repetition';
+    case 'insufficient_material':
+      return 'Insufficient Material';
+    case 'abandoned':
+      return 'Abandoned';
+    default:
+      return g.termination || 'Completed';
+  }
 }
 
 function getSpeedBadge(timeControl: string, category?: string) {
@@ -600,24 +661,7 @@ export default function UserProfilePage() {
                   const userLost = !won && !draw;
 
                   const outcomeText = userWon ? 'Won' : userLost ? 'Lost' : 'Draw';
-                  const terminationLabel =
-                    g.termination === 'checkmate'
-                      ? 'Checkmate'
-                      : g.termination === 'resignation'
-                      ? 'Resignation'
-                      : g.termination === 'timeout'
-                      ? 'Timeout'
-                      : g.termination === 'draw_agreed' || g.termination === 'draw_agreement'
-                      ? 'Draw by agreement'
-                      : g.termination === 'stalemate'
-                      ? 'Stalemate'
-                      : g.termination === 'repetition'
-                      ? 'Repetition'
-                      : g.termination === 'insufficient_material'
-                      ? 'Insufficient material'
-                      : g.termination === 'abandoned'
-                      ? 'Abandoned'
-                      : g.termination || 'Completed';
+                  const terminationLabel = getPerspectiveTerminationLabel(g, profile.id);
 
                   const speed = getSpeedBadge(g.timeControl, g.category);
                   const isWhiteProfile = g.whiteUsername.toLowerCase() === profile.username.toLowerCase();
